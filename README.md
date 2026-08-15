@@ -4,6 +4,7 @@
 [![Go version](https://img.shields.io/github/go-mod/go-version/cplieger/langtag)](https://github.com/cplieger/langtag/blob/main/go.mod)
 [![Test coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/langtag/badges/coverage.json)](https://github.com/cplieger/langtag/actions/workflows/coverage.yml)
 [![Mutation](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/langtag/badges/mutation.json)](https://github.com/cplieger/langtag/issues?q=label%3Agremlins-tracker)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14097/badge)](https://www.bestpractices.dev/projects/14097)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/cplieger/langtag/badge)](https://scorecard.dev/viewer/?uri=github.com/cplieger/langtag)
 
 > May this language track stand in for the one that was asked for, and how far a substitution is that
