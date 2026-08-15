@@ -1,7 +1,19 @@
 package langtag
 
-// Tier is how far an available language sits from the one that was wanted.
-// Lower is closer. A caller picks the highest tier it will accept as a floor.
+// Tier is how far an available language sits from the one that was wanted. A
+// caller picks the highest tier it will accept as a floor.
+//
+// The order is by KIND OF LICENSE, from narrowest to widest: the same tag, then
+// the same language, then the same language in another script, then a close
+// language, then a language readers merely happen to be schooled in. It is
+// deliberately NOT a reading-difficulty scale, and reading difficulty is not
+// monotonic along it. [TierOtherScript] is the exception worth knowing: CLDR
+// rates sr-Latn against sr-Cyrl at distance 5, but has no entry for zh-Hans
+// against zh-Hant, which therefore falls through to its generic cross-script
+// distance of 50, farther than any pair on the two tiers above. So a script
+// substitution can be a bigger ask than a close-language one, even though it
+// sits lower. A caller serving Chinese content should weigh that before
+// accepting TierOtherScript.
 //
 // Tiers 0 through 2 follow from published standards data and hold no opinion.
 // The two tiers above them are curated judgments, and they are separated

@@ -92,8 +92,15 @@ The zero `Tag` matches nothing, including another zero `Tag`. Two tracks both la
 
 ## Tiers
 
-`Compare(want, have)` reports how far the available language sits from the wanted one. Lower is
-closer. A caller passes the highest tier it will accept as a floor.
+`Compare(want, have)` reports how far the available language sits from the wanted one. A caller
+passes the highest tier it will accept as a floor.
+
+The order is by **kind of license**, from narrowest to widest, not by reading difficulty. Reading
+difficulty is not monotonic along it, and `TierOtherScript` is where that bites: CLDR rates
+`sr-Latn` against `sr-Cyrl` at distance 5, but carries no entry at all for `zh-Hans` against
+`zh-Hant`, which falls through to the generic cross-script distance of 50. That is farther than
+every pair on the two tiers above it. So accepting `other-script` is a bigger ask for Chinese
+content than accepting `intelligible` is for Norwegian, despite sitting lower on the ladder.
 
 | Tier | Meaning | Examples |
 | --- | --- | --- |

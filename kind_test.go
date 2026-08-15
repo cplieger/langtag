@@ -57,21 +57,103 @@ func TestFallbackKindMatchesDirection(t *testing.T) {
 	}
 }
 
-// TestSharedLiteracyIsNeverReciprocated covers the authoring mistake directly:
-// even if a table sets Both on a shared-literacy entry, the reverse direction
-// must not be admitted.
-func TestSharedLiteracyIsNeverReciprocated(t *testing.T) {
+// TestSharedLiteracyIsOneWay covers a well-formed one-way entry: it applies in
+// the stated direction and not in reverse.
+func TestSharedLiteracyIsOneWay(t *testing.T) {
 	t.Parallel()
 	c := langtag.WithFallbacks([]langtag.Fallback{
-		{Want: "ca", Have: "es", Kind: langtag.SharedLiteracy, Both: true, Reason: "test"},
+		{Want: "ca", Have: "es", Kind: langtag.SharedLiteracy, Reason: "test"},
 	})
 	ca, es := langtag.MustParse("ca"), langtag.MustParse("es")
 	if got := c.Compare(ca, es); got != langtag.TierSharedLiteracy {
 		t.Errorf("Compare(ca, es) = %v, want %v", got, langtag.TierSharedLiteracy)
 	}
 	if got := c.Compare(es, ca); got != langtag.TierNone {
-		t.Errorf("Compare(es, ca) = %v, want %v; Both must be ignored for a shared-literacy entry",
+		t.Errorf("Compare(es, ca) = %v, want %v (a shared-literacy claim is not reciprocated)",
 			got, langtag.TierNone)
+	}
+}
+
+// TestMalformedFallbacksAreDropped is the fix for the fail-open defect two
+// reviewers found independently.
+//
+// Kind decides the tier, and its zero value used to be Intelligible, the
+// stronger of the two claims. So a caller-supplied entry that simply forgot to
+// set Kind landed a one-way relationship on the tier reserved for symmetric
+// ones, which is the exact error the Kind field exists to prevent. A malformed
+// entry now removes a substitution rather than licensing an unintended one.
+func TestMalformedFallbacksAreDropped(t *testing.T) {
+	t.Parallel()
+	cases := map[string]langtag.Fallback{
+		"kind unset":            {Want: "sv", Have: "no", Reason: "r", Both: false},
+		"kind unset but both":   {Want: "sv", Have: "no", Reason: "r", Both: true},
+		"unknown kind":          {Want: "sv", Have: "no", Reason: "r", Kind: langtag.Kind(9), Both: true},
+		"intelligible one way":  {Want: "sv", Have: "no", Reason: "r", Kind: langtag.Intelligible},
+		"shared literacy both":  {Want: "sv", Have: "no", Reason: "r", Kind: langtag.SharedLiteracy, Both: true},
+		"blank want":            {Want: "", Have: "no", Reason: "r", Kind: langtag.Intelligible, Both: true},
+		"blank have":            {Want: "sv", Have: "", Reason: "r", Kind: langtag.Intelligible, Both: true},
+		"same language on both": {Want: "sv", Have: "sv", Reason: "r", Kind: langtag.Intelligible, Both: true},
+	}
+	sv, no := langtag.MustParse("sv"), langtag.MustParse("no")
+	for name, f := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c := langtag.WithFallbacks([]langtag.Fallback{f})
+			if got := c.Compare(sv, no); got != langtag.TierNone {
+				t.Errorf("Compare(sv, no) with a malformed entry = %v, want %v", got, langtag.TierNone)
+			}
+			if errs := langtag.ValidateFallbacks([]langtag.Fallback{f}); len(errs) != 1 {
+				t.Errorf("ValidateFallbacks returned %d errors, want 1: %v", len(errs), errs)
+			}
+		})
+	}
+}
+
+func TestValidateFallbacksAcceptsTheBuiltInTable(t *testing.T) {
+	t.Parallel()
+	if errs := langtag.ValidateFallbacks(langtag.Fallbacks()); errs != nil {
+		t.Errorf("ValidateFallbacks(Fallbacks()) = %v, want nil; the shipped table must satisfy its own contract", errs)
+	}
+}
+
+// TestUnusableFloorSelectsNothing is the second half of the fail-open fix.
+//
+// TierNone means "no relationship", so treating it as a floor accepted every
+// language as a substitute for every other. It is also what ParseTier returns
+// for input it does not recognise, so a mistyped configuration value was the
+// most permissive setting available rather than the least.
+func TestUnusableFloorSelectsNothing(t *testing.T) {
+	t.Parallel()
+	ta, en := langtag.MustParse("ta"), langtag.MustParse("en")
+	var zero langtag.Tag
+
+	for _, floor := range []langtag.Tier{langtag.TierNone, langtag.Tier(99)} {
+		if langtag.Match(ta, en, floor) {
+			t.Errorf("Match(ta, en, %v) = true, want false", floor)
+		}
+		if langtag.Match(zero, zero, floor) {
+			t.Errorf("Match(zero, zero, %v) = true, want false", floor)
+		}
+		got, tier, ok := langtag.Best(langtag.MustParse("ca"),
+			[]langtag.Tag{langtag.MustParse("es")},
+			func(t langtag.Tag) langtag.Tag { return t }, floor)
+		if ok {
+			t.Errorf("Best(ca, [es], %v) = (%v, %v, true), want ok=false; an unusable floor must not widen to the most permissive tier",
+				floor, got, tier)
+		}
+	}
+}
+
+// TestMistypedTierFailsClosed joins the two halves: the value ParseTier hands
+// back on failure must be the least permissive floor, not the most.
+func TestMistypedTierFailsClosed(t *testing.T) {
+	t.Parallel()
+	floor, ok := langtag.ParseTier("looose")
+	if ok {
+		t.Fatalf("ParseTier(%q) ok = true, want false", "looose")
+	}
+	if langtag.Match(langtag.MustParse("ta"), langtag.MustParse("en"), floor) {
+		t.Error("a caller that ignored ParseTier's ok value got a floor that matches everything, want one that matches nothing")
 	}
 }
 

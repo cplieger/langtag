@@ -1,5 +1,7 @@
 package langtag
 
+import "fmt"
+
 // Comparer answers tier questions against a specific fallback table. Use it
 // when the built-in cross-language judgments do not suit the deployment; the
 // package-level [Compare], [Match] and [Best] use the built-in table.
@@ -36,32 +38,72 @@ func Default() *Comparer { return defaultComparer }
 // Entries name languages as [Tag.Language] reports them, so "no" rather than
 // "nb" or "nor". An entry naming anything else simply never matches.
 //
-// An entry whose Kind is [SharedLiteracy] is applied in the stated direction
-// only, whatever Both says. A population that reads a majority language does
-// not put the majority population under the same obligation, so a reciprocal
-// shared-literacy claim is always an authoring mistake rather than a policy.
+// Malformed entries are DROPPED rather than accommodated, so a table authoring
+// mistake removes a substitution instead of licensing an unintended one. See
+// [ValidateFallbacks] to find out which entries were rejected and why. An entry
+// is malformed when it names no language on either side, names one language on
+// both, carries no Kind, or claims a Kind that disagrees with its direction.
 func WithFallbacks(f []Fallback) *Comparer {
 	c := &Comparer{fallbacks: make(map[string]map[string]fallbackHit, len(f))}
 	add := func(want, have, reason string, tier Tier) {
-		if want == "" || have == "" || want == have {
-			// A self-directed or incomplete entry cannot change any answer:
-			// identical languages are already TierIdentical or
-			// TierSameLanguage. Dropping it keeps the table's meaning honest.
-			return
-		}
 		if c.fallbacks[want] == nil {
 			c.fallbacks[want] = make(map[string]fallbackHit, 2)
 		}
 		c.fallbacks[want][have] = fallbackHit{reason: reason, tier: tier}
 	}
 	for _, e := range f {
+		if fallbackError(e) != "" {
+			continue
+		}
 		tier := e.Kind.Tier()
 		add(e.Want, e.Have, e.Reason, tier)
-		if e.Both && e.Kind != SharedLiteracy {
+		// Only an interchangeability claim is reciprocated. A shared-literacy
+		// claim runs one way even if an author set Both, because a majority
+		// population does not read the minority language back.
+		if e.Both && e.Kind == Intelligible {
 			add(e.Have, e.Want, e.Reason, tier)
 		}
 	}
 	return c
+}
+
+// ValidateFallbacks reports why each rejected entry in f was rejected, in
+// order, and returns nil when every entry is usable. [WithFallbacks] drops the
+// same entries silently, because a table is configuration rather than a
+// runtime input; this is the way to find out what it dropped.
+func ValidateFallbacks(f []Fallback) []error {
+	var errs []error
+	for i, e := range f {
+		if msg := fallbackError(e); msg != "" {
+			errs = append(errs, fmt.Errorf("fallback %d (%q -> %q): %s", i, e.Want, e.Have, msg))
+		}
+	}
+	return errs
+}
+
+// fallbackError returns the reason an entry is unusable, or the empty string
+// when it is fine. The Kind-versus-direction rule is enforced here rather than
+// only asserted in a test, so a caller-supplied table is held to the same
+// contract as the built-in one.
+func fallbackError(e Fallback) string {
+	switch {
+	case e.Want == "" || e.Have == "":
+		return "both sides must name a language"
+	case e.Want == e.Have:
+		// Identical languages already match at TierIdentical or
+		// TierSameLanguage, so such an entry could only ever be noise.
+		return "both sides name the same language"
+	case e.Kind == KindUnset:
+		return "Kind must be set; an unset Kind would inherit the stronger tier"
+	case e.Kind != Intelligible && e.Kind != SharedLiteracy:
+		return "unknown Kind"
+	case e.Kind == Intelligible && !e.Both:
+		return "an Intelligible entry must be symmetric; a one-way claim is shared literacy"
+	case e.Kind == SharedLiteracy && e.Both:
+		return "a SharedLiteracy entry must not be symmetric; a majority population does not reciprocate"
+	default:
+		return ""
+	}
 }
 
 // Compare reports how far the available tag have sits from the wanted tag
@@ -117,7 +159,16 @@ func Reason(want, have Tag) (string, bool) { return defaultComparer.Reason(want,
 
 // Match reports whether have is an acceptable stand-in for want at or within
 // floor, using the built-in table.
+//
+// [TierNone] is not a usable floor and always reports false, in either
+// position. It means "no relationship", so accepting it as a floor would accept
+// every language as a substitute for every other. That matters because it is
+// also what [ParseTier] returns for input it does not recognise: a mistyped
+// configuration value therefore matches nothing rather than everything.
 func Match(want, have Tag, floor Tier) bool {
+	if floor >= TierNone {
+		return false
+	}
 	return defaultComparer.Compare(want, have) <= floor
 }
 
@@ -139,12 +190,13 @@ func Best[T any](want Tag, candidates []T, tagOf func(T) Tag, floor Tier) (out [
 // own type without building a parallel slice and mapping indices back. A
 // candidate whose tag is the zero Tag never matches.
 //
-// floor is capped at [TierSharedLiteracy]: a floor of [TierNone] would
-// otherwise accept every language as a substitute for every other, which is
-// never what a caller means.
+// A floor of [TierNone] or beyond selects nothing, and does NOT widen to the
+// most permissive tier. An unrecognised configuration value parses to TierNone
+// (see [ParseTier]), and the safe reading of an unusable floor is that no
+// substitution was authorised, not that every substitution was.
 func BestWith[T any](c *Comparer, want Tag, candidates []T, tagOf func(T) Tag, floor Tier) (out []T, tier Tier, ok bool) {
 	if floor >= TierNone {
-		floor = TierSharedLiteracy
+		return nil, TierNone, false
 	}
 	best := TierNone
 	for _, cand := range candidates {

@@ -157,14 +157,14 @@ func TestWithFallbacksNilDisablesTierThree(t *testing.T) {
 func TestWithFallbacksCustomTable(t *testing.T) {
 	t.Parallel()
 	c := langtag.WithFallbacks([]langtag.Fallback{
-		{Want: "sv", Have: "no", Reason: "test-only claim", Both: false},
+		{Want: "sv", Have: "no", Reason: "test-only claim", Kind: langtag.Intelligible, Both: true},
 	})
 	sv, no := langtag.MustParse("sv"), langtag.MustParse("no")
 	if got := c.Compare(sv, no); got != langtag.TierIntelligible {
 		t.Errorf("custom Compare(sv, no) = %v, want %v", got, langtag.TierIntelligible)
 	}
-	if got := c.Compare(no, sv); got != langtag.TierNone {
-		t.Errorf("custom Compare(no, sv) = %v, want %v (entry is one-way)", got, langtag.TierNone)
+	if got := c.Compare(no, sv); got != langtag.TierIntelligible {
+		t.Errorf("custom Compare(no, sv) = %v, want %v (a symmetric entry runs both ways)", got, langtag.TierIntelligible)
 	}
 	// A custom table replaces the built-in one rather than extending it.
 	if got := c.Compare(langtag.MustParse("nb"), langtag.MustParse("nn")); got != langtag.TierNone {
@@ -178,9 +178,9 @@ func TestWithFallbacksCustomTable(t *testing.T) {
 func TestWithFallbacksIgnoresDegenerateEntries(t *testing.T) {
 	t.Parallel()
 	c := langtag.WithFallbacks([]langtag.Fallback{
-		{Want: "en", Have: "en", Reason: "self"},
-		{Want: "", Have: "es", Reason: "blank want"},
-		{Want: "ca", Have: "", Reason: "blank have"},
+		{Want: "en", Have: "en", Reason: "self", Kind: langtag.Intelligible, Both: true},
+		{Want: "", Have: "es", Reason: "blank want", Kind: langtag.Intelligible, Both: true},
+		{Want: "ca", Have: "", Reason: "blank have", Kind: langtag.SharedLiteracy},
 	})
 	if got := c.Compare(langtag.MustParse("en"), langtag.MustParse("en")); got != langtag.TierIdentical {
 		t.Errorf("Compare(en, en) = %v, want %v", got, langtag.TierIdentical)

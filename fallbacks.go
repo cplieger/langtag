@@ -6,9 +6,15 @@ package langtag
 type Kind uint8
 
 const (
+	// KindUnset is the zero value, and it is not a usable Kind. An entry must
+	// name its kind, because the two kinds land on different tiers and the
+	// weaker claim must never inherit the stronger tier by default. Entries
+	// carrying KindUnset are dropped by [WithFallbacks].
+	KindUnset Kind = iota
+
 	// Intelligible means the two languages are close enough that readers move
 	// between them. Such a relationship runs both ways.
-	Intelligible Kind = iota
+	Intelligible
 
 	// SharedLiteracy means readers of the wanted language are, as a population,
 	// literate in the other one, which may be entirely unrelated. Such a
@@ -17,20 +23,30 @@ const (
 	SharedLiteracy
 )
 
-// Tier returns the tier an entry of this Kind produces.
+// Tier returns the tier an entry of this Kind produces. An unset or unknown
+// Kind yields [TierNone], so a malformed entry can never license a
+// substitution.
 func (k Kind) Tier() Tier {
-	if k == SharedLiteracy {
+	switch k {
+	case Intelligible:
+		return TierIntelligible
+	case SharedLiteracy:
 		return TierSharedLiteracy
+	default:
+		return TierNone
 	}
-	return TierIntelligible
 }
 
 // String returns the name of the kind.
 func (k Kind) String() string {
-	if k == SharedLiteracy {
+	switch k {
+	case Intelligible:
+		return nameIntelligible
+	case SharedLiteracy:
 		return nameSharedLiteracy
+	default:
+		return "unset"
 	}
-	return nameIntelligible
 }
 
 // Fallback is one directed cross-language relationship: a reader who wants the
