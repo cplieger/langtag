@@ -1,33 +1,48 @@
 package langtag
 
 // Comparer answers tier questions against a specific fallback table. Use it
-// when the built-in tier-3 judgments do not suit the deployment; the
+// when the built-in cross-language judgments do not suit the deployment; the
 // package-level [Compare], [Match] and [Best] use the built-in table.
 //
 // A Comparer is immutable after construction and safe for concurrent use.
 type Comparer struct {
-	// fallbacks maps a wanted language subtag to every language that may
-	// stand in for it, flattened from the directed table at construction so a
-	// lookup is one map hit rather than a scan.
-	fallbacks map[string]map[string]string
+	// fallbacks maps a wanted language subtag to every language that may stand
+	// in for it, flattened from the directed table at construction so a lookup
+	// is one map hit rather than a scan. The value carries the tier the entry
+	// produces alongside its reason, because the two kinds of entry land on
+	// different tiers.
+	fallbacks map[string]map[string]fallbackHit
+}
+
+// fallbackHit is what a table lookup yields: which tier the substitution sits
+// at, and the argument for it.
+type fallbackHit struct {
+	reason string
+	tier   Tier
 }
 
 // defaultComparer carries the built-in table. Built once at init because the
 // flattening is pure and the result is read-only.
 var defaultComparer = WithFallbacks(builtinFallbacks)
 
-// Default returns the Comparer backed by the built-in tier-3 table.
+// Default returns the Comparer backed by the built-in table.
 func Default() *Comparer { return defaultComparer }
 
-// WithFallbacks returns a Comparer using the supplied tier-3 table instead of
-// the built-in one. Passing nil or an empty slice disables tier 3, so no
-// cross-language substitution can occur at any floor.
+// WithFallbacks returns a Comparer using the supplied cross-language table
+// instead of the built-in one. Passing nil or an empty slice disables both
+// cross-language tiers, so no substitution beyond [TierOtherScript] can occur
+// at any floor.
 //
 // Entries name languages as [Tag.Language] reports them, so "no" rather than
 // "nb" or "nor". An entry naming anything else simply never matches.
+//
+// An entry whose Kind is [SharedLiteracy] is applied in the stated direction
+// only, whatever Both says. A population that reads a majority language does
+// not put the majority population under the same obligation, so a reciprocal
+// shared-literacy claim is always an authoring mistake rather than a policy.
 func WithFallbacks(f []Fallback) *Comparer {
-	c := &Comparer{fallbacks: make(map[string]map[string]string, len(f))}
-	add := func(want, have, reason string) {
+	c := &Comparer{fallbacks: make(map[string]map[string]fallbackHit, len(f))}
+	add := func(want, have, reason string, tier Tier) {
 		if want == "" || have == "" || want == have {
 			// A self-directed or incomplete entry cannot change any answer:
 			// identical languages are already TierIdentical or
@@ -35,23 +50,24 @@ func WithFallbacks(f []Fallback) *Comparer {
 			return
 		}
 		if c.fallbacks[want] == nil {
-			c.fallbacks[want] = make(map[string]string, 2)
+			c.fallbacks[want] = make(map[string]fallbackHit, 2)
 		}
-		c.fallbacks[want][have] = reason
+		c.fallbacks[want][have] = fallbackHit{reason: reason, tier: tier}
 	}
 	for _, e := range f {
-		add(e.Want, e.Have, e.Reason)
-		if e.Both {
-			add(e.Have, e.Want, e.Reason)
+		tier := e.Kind.Tier()
+		add(e.Want, e.Have, e.Reason, tier)
+		if e.Both && e.Kind != SharedLiteracy {
+			add(e.Have, e.Want, e.Reason, tier)
 		}
 	}
 	return c
 }
 
 // Compare reports how far the available tag have sits from the wanted tag
-// want, using the built-in tier-3 table.
+// want, using the built-in table.
 //
-// The argument order is load-bearing. Tier-3 entries are directed, so
+// The argument order is load-bearing. Cross-language entries are directed, so
 // Compare(want, have) and Compare(have, want) can differ: a Catalan viewer
 // accepts a Spanish track, and a Spanish viewer does not accept a Catalan one.
 // want is always the language a person chose; have is what the content offers.
@@ -78,35 +94,35 @@ func (c *Comparer) Compare(want, have Tag) Tier {
 		}
 		return TierOtherScript
 	}
-	if _, ok := c.fallbacks[want.macroBase][have.macroBase]; ok {
-		return TierSensitive
+	if hit, ok := c.fallbacks[want.macroBase][have.macroBase]; ok {
+		return hit.tier
 	}
 	return TierNone
 }
 
-// Reason returns the recorded justification for a tier-3 substitution, and
-// ok=false when the pair is not a tier-3 relationship. Intended for explaining
+// Reason returns the recorded justification for a cross-language substitution,
+// and ok=false when the pair is not one. Intended for explaining
 // a surprising choice in a log line or a user-facing message.
 func (c *Comparer) Reason(want, have Tag) (string, bool) {
 	if want.IsZero() || have.IsZero() {
 		return "", false
 	}
-	r, ok := c.fallbacks[want.macroBase][have.macroBase]
-	return r, ok
+	hit, ok := c.fallbacks[want.macroBase][have.macroBase]
+	return hit.reason, ok
 }
 
-// Reason returns the recorded justification for a tier-3 substitution under
-// the built-in table. See [Comparer.Reason].
+// Reason returns the recorded justification for a cross-language substitution
+// under the built-in table. See [Comparer.Reason].
 func Reason(want, have Tag) (string, bool) { return defaultComparer.Reason(want, have) }
 
 // Match reports whether have is an acceptable stand-in for want at or within
-// floor, using the built-in tier-3 table.
+// floor, using the built-in table.
 func Match(want, have Tag, floor Tier) bool {
 	return defaultComparer.Compare(want, have) <= floor
 }
 
 // Best returns the candidates closest to want and the tier they matched at,
-// using the built-in tier-3 table. See [BestWith].
+// using the built-in table. See [BestWith].
 func Best[T any](want Tag, candidates []T, tagOf func(T) Tag, floor Tier) (out []T, tier Tier, ok bool) {
 	return BestWith(defaultComparer, want, candidates, tagOf, floor)
 }
@@ -123,12 +139,12 @@ func Best[T any](want Tag, candidates []T, tagOf func(T) Tag, floor Tier) (out [
 // own type without building a parallel slice and mapping indices back. A
 // candidate whose tag is the zero Tag never matches.
 //
-// floor is capped at [TierSensitive]: a floor of [TierNone] would otherwise
-// accept every language as a substitute for every other, which is never what a
-// caller means.
+// floor is capped at [TierSharedLiteracy]: a floor of [TierNone] would
+// otherwise accept every language as a substitute for every other, which is
+// never what a caller means.
 func BestWith[T any](c *Comparer, want Tag, candidates []T, tagOf func(T) Tag, floor Tier) (out []T, tier Tier, ok bool) {
 	if floor >= TierNone {
-		floor = TierSensitive
+		floor = TierSharedLiteracy
 	}
 	best := TierNone
 	for _, cand := range candidates {

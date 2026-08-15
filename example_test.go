@@ -30,7 +30,7 @@ func ExampleCompare() {
 	// Output:
 	// a viewer wanting nob, offered nob : identical
 	// a viewer wanting nob, offered nor : same-language
-	// a viewer wanting nob, offered nn  : sensitive
+	// a viewer wanting nob, offered nn  : intelligible
 	// a viewer wanting nob, offered sv  : none
 }
 
@@ -41,7 +41,7 @@ func ExampleCompare_directed() {
 	fmt.Println("wanting ca, offered es:", langtag.Compare(ca, es))
 	fmt.Println("wanting es, offered ca:", langtag.Compare(es, ca))
 	// Output:
-	// wanting ca, offered es: sensitive
+	// wanting ca, offered es: shared-literacy
 	// wanting es, offered ca: none
 }
 
@@ -96,7 +96,7 @@ func ExampleReason() {
 	fmt.Println(reason)
 	// Output:
 	// true
-	// Written Bokmål derives from Danish and the two remain close in writing, though not in speech.
+	// Written Bokmål derives from Danish and the two remain close on the page. This is a written-language claim only; the spoken languages are much further apart.
 }
 
 // A deployment that disagrees with a shipped judgment replaces the table
@@ -107,6 +107,6 @@ func ExampleWithFallbacks() {
 	fmt.Println("built-in:", langtag.Compare(nb, nn))
 	fmt.Println("no table:", strict.Compare(nb, nn))
 	// Output:
-	// built-in: sensitive
+	// built-in: intelligible
 	// no table: none
 }

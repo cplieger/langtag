@@ -44,22 +44,28 @@ func TestCompare(t *testing.T) {
 		"mandarin traditional vs chinese simplified": {"cmn-Hant", "zh-Hans", langtag.TierOtherScript},
 
 		// Tier 3: a different language, from the curated table.
-		"bokmal wants nynorsk":    {"nb", "nn", langtag.TierSensitive},
-		"nynorsk wants bokmal":    {"nn", "nb", langtag.TierSensitive},
-		"norwegian wants nynorsk": {"nor", "nno", langtag.TierSensitive},
-		"norwegian wants danish":  {"no", "da", langtag.TierSensitive},
-		"danish wants norwegian":  {"da", "nb", langtag.TierSensitive},
-		"croatian wants bosnian":  {"hr", "bs", langtag.TierSensitive},
-		"bosnian wants croatian":  {"bs", "hr", langtag.TierSensitive},
-		"catalan wants spanish":   {"ca", "es", langtag.TierSensitive},
+		"bokmal wants nynorsk":    {"nb", "nn", langtag.TierIntelligible},
+		"nynorsk wants bokmal":    {"nn", "nb", langtag.TierIntelligible},
+		"norwegian wants nynorsk": {"nor", "nno", langtag.TierIntelligible},
+		"norwegian wants danish":  {"no", "da", langtag.TierIntelligible},
+		"danish wants norwegian":  {"da", "nb", langtag.TierIntelligible},
+		"croatian wants bosnian":  {"hr", "bs", langtag.TierIntelligible},
+		"bosnian wants croatian":  {"bs", "hr", langtag.TierIntelligible},
+		"czech wants slovak":      {"cs", "sk", langtag.TierIntelligible},
+		"slovak wants czech":      {"sk", "cs", langtag.TierIntelligible},
 
-		// Tier 4: unrelated, or related in ways this package refuses to act on.
+		// Tier 4: a different language reachable only because readers of the
+		// first are broadly literate in the second. One direction only.
+		"catalan wants spanish": {"ca", "es", langtag.TierSharedLiteracy},
+
+		// Tier 5: unrelated, or related in ways this package refuses to act on.
 		"norwegian wants swedish":        {"no", "sv", langtag.TierNone},
 		"danish wants swedish":           {"da", "sv", langtag.TierNone},
 		"spanish wants catalan":          {"es", "ca", langtag.TierNone},
 		"serbian wants croatian":         {"sr", "hr", langtag.TierNone},
-		"czech wants slovak":             {"cs", "sk", langtag.TierNone},
 		"hindi wants urdu":               {"hi", "ur", langtag.TierNone},
+		"polish wants czech":             {"pl", "cs", langtag.TierNone},
+		"galician wants spanish":         {"gl", "es", langtag.TierNone},
 		"cantonese wants mandarin":       {"yue", "cmn", langtag.TierNone},
 		"egyptian wants standard arabic": {"arz", "arb", langtag.TierNone},
 		"english wants japanese":         {"en", "ja", langtag.TierNone},
@@ -145,8 +151,8 @@ func TestCompareExcludesSharedLiteracy(t *testing.T) {
 func TestCompareIsDirected(t *testing.T) {
 	t.Parallel()
 	ca, es := langtag.MustParse("ca"), langtag.MustParse("es")
-	if got := langtag.Compare(ca, es); got != langtag.TierSensitive {
-		t.Errorf("Compare(ca, es) = %v, want %v (a Catalan reader reads Spanish)", got, langtag.TierSensitive)
+	if got := langtag.Compare(ca, es); got != langtag.TierSharedLiteracy {
+		t.Errorf("Compare(ca, es) = %v, want %v (a Catalan reader reads Spanish)", got, langtag.TierSharedLiteracy)
 	}
 	if got := langtag.Compare(es, ca); got != langtag.TierNone {
 		t.Errorf("Compare(es, ca) = %v, want %v (a Spanish reader does not read Catalan)", got, langtag.TierNone)
@@ -169,7 +175,9 @@ func TestMatch(t *testing.T) {
 		"same-language floor rejects script":    {hans, hant, langtag.TierSameLanguage, false},
 		"other-script floor accepts script":     {hans, hant, langtag.TierOtherScript, true},
 		"other-script floor rejects nynorsk":    {nob, nn, langtag.TierOtherScript, false},
-		"sensitive floor accepts nynorsk":       {nob, nn, langtag.TierSensitive, true},
+		"intelligible floor accepts nynorsk":    {nob, nn, langtag.TierIntelligible, true},
+		"intelligible floor rejects catalan":    {langtag.MustParse("ca"), langtag.MustParse("es"), langtag.TierIntelligible, false},
+		"shared-literacy floor accepts catalan": {langtag.MustParse("ca"), langtag.MustParse("es"), langtag.TierSharedLiteracy, true},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -193,7 +201,7 @@ func TestMatchIsMonotonicInFloor(t *testing.T) {
 	}
 	floors := []langtag.Tier{
 		langtag.TierIdentical, langtag.TierSameLanguage,
-		langtag.TierOtherScript, langtag.TierSensitive,
+		langtag.TierOtherScript, langtag.TierIntelligible, langtag.TierSharedLiteracy,
 	}
 	for _, a := range tags {
 		for _, b := range tags {

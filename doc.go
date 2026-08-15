@@ -20,9 +20,11 @@
 // # Distance is graded, not binary
 //
 // [Compare] reports a [Tier]: how far a candidate sits from what was wanted.
-// Tiers 0 through 2 are derived from published standards data. Tier 3 is a
-// curated table of judgments, and it is the only tier that encodes an opinion.
-// A caller sets a floor and nothing beyond that floor is a match.
+// Tiers 0 through 2 are derived from published standards data. The two above
+// them are curated judgments, split because they make different claims:
+// [TierIntelligible] says two languages are close enough to read across, and
+// [TierSharedLiteracy] says only that readers of one are broadly literate in
+// the other. A caller sets a floor and nothing beyond it is a match.
 //
 //	want, _ := langtag.Parse("nob")
 //	have, _ := langtag.Parse("nor")
@@ -30,14 +32,18 @@
 //
 // # What this package deliberately will not do
 //
-// It will not substitute an unrelated language on the grounds that a
-// population reads both. CLDR's own distance data rates Basque against
-// Spanish, Welsh against English and Tamil against English as close, because
-// those populations are broadly literate in the second language. That is
-// accurate sociolinguistics and a poor substitution rule: a viewer who chose
-// Tamil subtitles did not ask for English ones. Tiers 0 through 2 cannot
-// express a cross-language substitution at all, so the whole family is
-// excluded by construction rather than by a filter.
+// It will not substitute an unrelated language at the intelligible tier or
+// below. CLDR's own distance data rates Basque against Spanish, Welsh against
+// English and Tamil against English as close, because those populations are
+// broadly literate in the second language. That is accurate sociolinguistics
+// and a poor default: a viewer who chose Tamil subtitles did not ask for
+// English ones. Claims of that shape live at [TierSharedLiteracy] alone, named
+// for what they are, and the table ships one of them.
+//
+// Every cross-language entry is a claim about reading. Danish and Norwegian are
+// close on the page and much further apart aloud. Software matching an audio
+// track should stop at [TierOtherScript]; this package cannot tell which kind
+// of track a caller is matching.
 //
 // It is not a general internationalization library. There is no collation, no
 // formatting and no content negotiation. Display names live in the optional

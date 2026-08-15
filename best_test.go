@@ -50,7 +50,7 @@ func TestBest(t *testing.T) {
 		},
 		"exact still wins when both variants are present": {
 			want: "nob", available: []string{"eng", "nor", "nob", "nno"},
-			floor:  langtag.TierSensitive,
+			floor:  langtag.TierIntelligible,
 			picked: []string{"nob"}, tier: langtag.TierIdentical, ok: true,
 		},
 		"the spanish pair: es-ES reference prefers es-ES over es-419": {
@@ -75,7 +75,7 @@ func TestBest(t *testing.T) {
 		},
 		"nothing within floor": {
 			want: "nob", available: []string{"eng", "swe"},
-			floor:  langtag.TierSensitive,
+			floor:  langtag.TierIntelligible,
 			picked: nil, tier: langtag.TierNone, ok: false,
 		},
 		"floor excludes an otherwise-valid candidate": {
@@ -85,7 +85,7 @@ func TestBest(t *testing.T) {
 		},
 		"empty candidate list": {
 			want: "en", available: nil,
-			floor:  langtag.TierSensitive,
+			floor:  langtag.TierIntelligible,
 			picked: nil, tier: langtag.TierNone, ok: false,
 		},
 	}
@@ -160,8 +160,8 @@ func TestWithFallbacksCustomTable(t *testing.T) {
 		{Want: "sv", Have: "no", Reason: "test-only claim", Both: false},
 	})
 	sv, no := langtag.MustParse("sv"), langtag.MustParse("no")
-	if got := c.Compare(sv, no); got != langtag.TierSensitive {
-		t.Errorf("custom Compare(sv, no) = %v, want %v", got, langtag.TierSensitive)
+	if got := c.Compare(sv, no); got != langtag.TierIntelligible {
+		t.Errorf("custom Compare(sv, no) = %v, want %v", got, langtag.TierIntelligible)
 	}
 	if got := c.Compare(no, sv); got != langtag.TierNone {
 		t.Errorf("custom Compare(no, sv) = %v, want %v (entry is one-way)", got, langtag.TierNone)
@@ -221,6 +221,7 @@ func TestFallbacksTable(t *testing.T) {
 		{"no", "nn", true},
 		{"no", "da", true},
 		{"hr", "bs", true},
+		{"cs", "sk", true},
 		{"ca", "es", false},
 	}
 	got := langtag.Fallbacks()
@@ -284,14 +285,16 @@ func TestParseTier(t *testing.T) {
 		tier langtag.Tier
 		ok   bool
 	}{
-		"identical":          {"identical", langtag.TierIdentical, true},
-		"same-language":      {"same-language", langtag.TierSameLanguage, true},
-		"underscore form":    {"same_language", langtag.TierSameLanguage, true},
-		"uppercase":          {"OTHER-SCRIPT", langtag.TierOtherScript, true},
-		"mixed with spaces":  {" Sensitive ", langtag.TierSensitive, true},
-		"none is not a knob": {"none", langtag.TierNone, false},
-		"unknown":            {"loose", langtag.TierNone, false},
-		"empty":              {"", langtag.TierNone, false},
+		"identical":           {"identical", langtag.TierIdentical, true},
+		"same-language":       {"same-language", langtag.TierSameLanguage, true},
+		"underscore form":     {"same_language", langtag.TierSameLanguage, true},
+		"uppercase":           {"OTHER-SCRIPT", langtag.TierOtherScript, true},
+		"mixed with spaces":   {" Intelligible ", langtag.TierIntelligible, true},
+		"shared literacy":     {"shared-literacy", langtag.TierSharedLiteracy, true},
+		"underscore literacy": {"shared_literacy", langtag.TierSharedLiteracy, true},
+		"none is not a knob":  {"none", langtag.TierNone, false},
+		"unknown":             {"loose", langtag.TierNone, false},
+		"empty":               {"", langtag.TierNone, false},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -310,7 +313,7 @@ func TestTierStringRoundTrips(t *testing.T) {
 	t.Parallel()
 	for _, tier := range []langtag.Tier{
 		langtag.TierIdentical, langtag.TierSameLanguage,
-		langtag.TierOtherScript, langtag.TierSensitive,
+		langtag.TierOtherScript, langtag.TierIntelligible, langtag.TierSharedLiteracy,
 	} {
 		s := tier.String()
 		got, ok := langtag.ParseTier(s)

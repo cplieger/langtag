@@ -4,8 +4,12 @@ package langtag
 // Lower is closer. A caller picks the highest tier it will accept as a floor.
 //
 // Tiers 0 through 2 follow from published standards data and hold no opinion.
-// [TierSensitive] is the only tier that encodes a judgment, which is why it is
-// named for that and why a caller must opt into it.
+// The two tiers above them are curated judgments, and they are separated
+// because they make different kinds of claim: [TierIntelligible] says two
+// languages are interchangeable, while [TierSharedLiteracy] says only that
+// readers of one are, as a population, literate in the other. The second is a
+// much weaker claim and the substitution it licenses is a different language
+// entirely, so reaching it takes its own opt-in.
 type Tier uint8
 
 const (
@@ -25,25 +29,51 @@ const (
 	// uz-Cyrl. Readers of one generally manage the other, with effort.
 	TierOtherScript
 
-	// TierSensitive means a different language that a reader of the wanted one
-	// can probably use. Every case is a judgment recorded in the fallback
-	// table, and several are contested, so this tier is never reached unless a
-	// caller asks for it.
-	TierSensitive
+	// TierIntelligible means two different languages that readers move between
+	// because the languages themselves are close: Bokmål and Nynorsk, Danish
+	// and Norwegian, Croatian and Bosnian, Czech and Slovak. The relationship
+	// runs both ways, which is the mark of interchangeability rather than of
+	// one population's schooling.
+	//
+	// These are written-language claims. Two languages readable to each other
+	// on the page are not necessarily comprehensible to each other aloud, and
+	// Danish against Norwegian is exactly that case. A caller matching audio
+	// should not reach this tier.
+	TierIntelligible
+
+	// TierSharedLiteracy means a different, not necessarily related language
+	// that readers of the wanted one can use because they are broadly literate
+	// in it. Catalan readers read Spanish. The relationship runs one way only,
+	// and the two languages may be unrelated.
+	//
+	// This tier exists so the claim can be made honestly and separately rather
+	// than smuggled in beside interchangeability. It is never reached unless a
+	// caller asks for it by name, and the table ships one entry: extending it
+	// to the rest of the family is a decision for whoever runs the software,
+	// through [WithFallbacks].
+	TierSharedLiteracy
 
 	// TierNone means no relationship worth acting on. It is also the answer
 	// whenever either tag is the zero Tag.
 	TierNone
 )
 
+// The configuration spellings of the two curated tiers. Named because
+// Tier.String, ParseTier and Kind.String must not drift apart.
+const (
+	nameIntelligible   = "intelligible"
+	nameSharedLiteracy = "shared-literacy"
+)
+
 // tierNames indexes Tier for String and is the inverse of the ParseTier table.
 // The strings are a configuration surface, so they are stable.
 var tierNames = [...]string{
-	TierIdentical:    "identical",
-	TierSameLanguage: "same-language",
-	TierOtherScript:  "other-script",
-	TierSensitive:    "sensitive",
-	TierNone:         "none",
+	TierIdentical:      "identical",
+	TierSameLanguage:   "same-language",
+	TierOtherScript:    "other-script",
+	TierIntelligible:   nameIntelligible,
+	TierSharedLiteracy: nameSharedLiteracy,
+	TierNone:           "none",
 }
 
 // String returns the configuration spelling of the tier.
@@ -67,8 +97,10 @@ func ParseTier(s string) (Tier, bool) {
 		return TierSameLanguage, true
 	case "other-script":
 		return TierOtherScript, true
-	case "sensitive":
-		return TierSensitive, true
+	case nameIntelligible:
+		return TierIntelligible, true
+	case nameSharedLiteracy:
+		return TierSharedLiteracy, true
 	default:
 		return TierNone, false
 	}
