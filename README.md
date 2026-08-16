@@ -148,7 +148,15 @@ Every entry also carries a `Provenance` field naming where the claim can be re-c
 all five is [CLDR's `languageInfo.xml`](https://github.com/unicode-org/cldr/blob/main/common/supplemental/languageInfo.xml).
 
 `WithFallbacks` replaces the table for a deployment that disagrees, and `WithFallbacks(nil)`
-disables both cross-language tiers.
+disables both cross-language tiers. A malformed entry is dropped rather than accommodated, so a
+mistake in a table removes a substitution instead of licensing an unintended one, and
+`ValidateFallbacks` reports what was dropped and why. When two entries claim one ordered pair at
+different tiers, the farther tier wins, so table order cannot decide how close a pair is.
+
+`TierNone` is not a usable floor. It means "no relationship", so accepting it would accept every
+language as a substitute for every other. `Match` and `Best` therefore report nothing for a floor at
+`TierNone` or beyond, which matters because that is also what `ParseTier` returns for a value it
+does not recognise: a mistyped configuration setting matches nothing rather than everything.
 
 ### A note on verifying these claims
 

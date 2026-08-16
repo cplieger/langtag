@@ -49,6 +49,15 @@ func WithFallbacks(f []Fallback) *Comparer {
 		if c.fallbacks[want] == nil {
 			c.fallbacks[want] = make(map[string]fallbackHit, 2)
 		}
+		// Two entries can name one ordered pair, most easily when a symmetric
+		// entry's reciprocal direction collides with an explicit one-way entry
+		// for the same pair. Keep the FARTHER tier, so a later entry can only
+		// ever narrow what a floor accepts. Overwriting would let table order
+		// decide how close a pair is, and would silently promote a declared
+		// shared-literacy claim onto the intelligible tier.
+		if prev, exists := c.fallbacks[want][have]; exists && prev.tier >= tier {
+			return
+		}
 		c.fallbacks[want][have] = fallbackHit{reason: reason, tier: tier}
 	}
 	for _, e := range f {
@@ -76,6 +85,39 @@ func ValidateFallbacks(f []Fallback) []error {
 	for i, e := range f {
 		if msg := fallbackError(e); msg != "" {
 			errs = append(errs, fmt.Errorf("fallback %d (%q -> %q): %s", i, e.Want, e.Have, msg))
+		}
+	}
+	return append(errs, conflictingPairs(f)...)
+}
+
+// conflictingPairs reports ordered pairs that more than one entry in f claims at
+// different tiers. Such a table is order-dependent, so the conflict is surfaced
+// rather than resolved silently, even though WithFallbacks resolves it
+// conservatively.
+func conflictingPairs(f []Fallback) []error {
+	type claim struct {
+		tier  Tier
+		index int
+	}
+	seen := make(map[[2]string]claim, len(f)*2)
+	var errs []error
+	record := func(want, have string, tier Tier, index int) {
+		key := [2]string{want, have}
+		if prev, exists := seen[key]; exists && prev.tier != tier {
+			errs = append(errs, fmt.Errorf(
+				"fallbacks %d and %d both claim %q -> %q, at %v and %v; the farther tier wins",
+				prev.index, index, want, have, prev.tier, tier))
+			return
+		}
+		seen[key] = claim{tier: tier, index: index}
+	}
+	for i, e := range f {
+		if fallbackError(e) != "" {
+			continue
+		}
+		record(e.Want, e.Have, e.Kind.Tier(), i)
+		if e.Both && e.Kind == Intelligible {
+			record(e.Have, e.Want, e.Kind.Tier(), i)
 		}
 	}
 	return errs
@@ -170,6 +212,17 @@ func Match(want, have Tag, floor Tier) bool {
 		return false
 	}
 	return defaultComparer.Compare(want, have) <= floor
+}
+
+// Match reports whether have is an acceptable stand-in for want at or within
+// floor, under this Comparer's table. See the package-level [Match] for the
+// floor contract, which is identical: a floor of [TierNone] or beyond always
+// reports false.
+func (c *Comparer) Match(want, have Tag, floor Tier) bool {
+	if floor >= TierNone {
+		return false
+	}
+	return c.Compare(want, have) <= floor
 }
 
 // Best returns the candidates closest to want and the tier they matched at,

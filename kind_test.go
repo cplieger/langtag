@@ -226,3 +226,55 @@ func TestExcludedFamilyStaysOutAtEveryFloor(t *testing.T) {
 		}
 	}
 }
+
+// TestConflictingEntriesKeepTheFartherTier pins the order-dependence a diff
+// review found.
+//
+// Two entries can name one ordered pair, most easily when a symmetric entry's
+// reciprocal direction collides with an explicit one-way entry for the same
+// pair. Overwriting would let table order decide how close a pair is, and would
+// silently promote a declared shared-literacy claim onto the intelligible tier.
+// The farther tier wins, so a later entry can only ever narrow what a floor
+// accepts, and ValidateFallbacks names the conflict rather than hiding it.
+func TestConflictingEntriesKeepTheFartherTier(t *testing.T) {
+	t.Parallel()
+	table := []langtag.Fallback{
+		{Want: "ca", Have: "es", Kind: langtag.SharedLiteracy, Reason: "one-way claim"},
+		{Want: "es", Have: "ca", Kind: langtag.Intelligible, Both: true, Reason: "symmetric claim"},
+	}
+	for _, order := range [][]langtag.Fallback{table, {table[1], table[0]}} {
+		c := langtag.WithFallbacks(order)
+		ca, es := langtag.MustParse("ca"), langtag.MustParse("es")
+		if got := c.Compare(ca, es); got != langtag.TierSharedLiteracy {
+			t.Errorf("Compare(ca, es) = %v, want %v; the farther tier must win regardless of table order",
+				got, langtag.TierSharedLiteracy)
+		}
+	}
+	errs := langtag.ValidateFallbacks(table)
+	if len(errs) == 0 {
+		t.Error("ValidateFallbacks reported no conflict for a table claiming one pair at two tiers, want one")
+	}
+}
+
+// TestComparerMatchHonorsTheFloorContract covers the gap a diff review found: a
+// caller using a custom table reached Compare but had no Match, so it had to
+// re-implement the floor comparison and would re-inherit the fail-open bug that
+// the package-level Match had already been fixed for.
+func TestComparerMatchHonorsTheFloorContract(t *testing.T) {
+	t.Parallel()
+	c := langtag.WithFallbacks(langtag.Fallbacks())
+	nob, nn := langtag.MustParse("nob"), langtag.MustParse("nn")
+	ta, en := langtag.MustParse("ta"), langtag.MustParse("en")
+
+	if !c.Match(nob, nn, langtag.TierIntelligible) {
+		t.Error("Comparer.Match(nob, nn, intelligible) = false, want true")
+	}
+	if c.Match(nob, nn, langtag.TierOtherScript) {
+		t.Error("Comparer.Match(nob, nn, other-script) = true, want false")
+	}
+	for _, floor := range []langtag.Tier{langtag.TierNone, langtag.Tier(99)} {
+		if c.Match(ta, en, floor) {
+			t.Errorf("Comparer.Match(ta, en, %v) = true, want false; an unusable floor must match nothing", floor)
+		}
+	}
+}
