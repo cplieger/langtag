@@ -96,17 +96,43 @@ The zero `Tag` matches nothing, including another zero `Tag`. Two tracks both la
 passes the highest tier it will accept as a floor.
 
 The order is by **kind of license**, from narrowest to widest, not by reading difficulty. Reading
-difficulty is not monotonic along it, and `TierOtherScript` is where that bites: CLDR rates
-`sr-Latn` against `sr-Cyrl` at distance 5, but carries no entry at all for `zh-Hans` against
-`zh-Hant`, which falls through to the generic cross-script distance of 50. That is farther than
-every pair on the two tiers above it. So accepting `other-script` is a bigger ask for Chinese
-content than accepting `intelligible` is for Norwegian, despite sitting lower on the ladder.
+difficulty is not monotonic along it, and `TierOtherScript` is where that bites. CLDR scores a
+generic same-language cross-script substitution at 50, farther than every pair on the two tiers
+above it, so accepting `other-script` is a bigger ask for Chinese content than accepting
+`intelligible` is for Norwegian.
+
+The script pairs CLDR _does_ explicitly rate as close sit on the tier below instead, so what remains
+on `other-script` is the set CLDR does not vouch for. See [Close scripts](#close-scripts).
+
+## Close scripts
+
+A script difference is normally farther than a region difference. A few languages are written in
+two scripts whose readers are taught both, where it is no barrier at all, and those sit at
+`TierSameLanguage`.
+
+Membership is derived rather than judged. CLDR names only a handful of same-language script pairs
+against its generic 50, and all but one are **one-way** transliteration rows (`ja-Latn` onto
+`ja-Jpan`, `hi-Latn` onto `hi-Deva`, and the other Latin romanizations). A romanization feeding its
+native script is not two audiences reading each other, which is the same reason a one-way language
+relation is shared literacy rather than interchangeability. One symmetric pair remains:
+
+| Language | Scripts | Why | Provenance |
+| --- | --- | --- | --- |
+| `sr` | `Latn` and `Cyrl` | Serbian is written in both and Serbian schooling teaches both | CLDR distance 5, symmetric, against a generic 50 |
+
+`CloseScripts` returns the list. Unlike the cross-language table it is not replaceable, because it
+records where CLDR states an explicit symmetric distance rather than a judgment about people. A
+caller that wants a script difference treated as a barrier regardless floors at `same-language`.
+
+Deliberately absent: Simplified against Traditional Chinese, which CLDR does not name and which
+therefore sits at the generic 50; and `uz-Latn` against `uz-Cyrl` and `az-Latn` against `az-Cyrl`,
+which `x/text`'s stale snapshot rates as close but upstream CLDR does not name either.
 
 | Tier | Meaning | Examples |
 | --- | --- | --- |
 | `TierIdentical` | The same language, the same canonical tag | `ger` and `deu`, `nor` and `no`, `iw` and `he` |
-| `TierSameLanguage` | One language, written the same way, differing at most in region | `nob` and `nor`, `cmn` and `zh`, `es-ES` and `es-419`, `en-GB` and `en-US` |
-| `TierOtherScript` | One language in a different script | `zh-Hans` and `zh-Hant`, `sr-Cyrl` and `sr-Latn` |
+| `TierSameLanguage` | One language a reader takes in without effort | `nob` and `nor`, `cmn` and `zh`, `es-ES` and `es-419`, `sr-Latn` and `sr-Cyrl` |
+| `TierOtherScript` | One language in a script its readers are not taught alongside | `zh-Hans` and `zh-Hant`, `uz-Latn` and `uz-Cyrl` |
 | `TierIntelligible` | Two different languages that are close enough to read across | `nb` and `nn`, `no` and `da`, `hr` and `bs`, `cs` and `sk` |
 | `TierSharedLiteracy` | A different language readers use because they are broadly literate in it | `ca` to `es` |
 | `TierNone` | No relationship worth acting on | `no` and `sv`, `hi` and `ur`, `pl` and `cs`, `gl` and `es` |

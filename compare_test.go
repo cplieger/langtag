@@ -35,11 +35,12 @@ func TestCompare(t *testing.T) {
 		"bare vs regional danish":            {"da", "da-DK", langtag.TierSameLanguage},
 		"bare chinese vs simplified":         {"zh", "zh-Hans", langtag.TierSameLanguage},
 		"bare serbian vs cyrillic":           {"sr", "sr-Cyrl", langtag.TierSameLanguage},
+		"serbian scripts read as one":        {"sr-Cyrl", "sr-Latn", langtag.TierSameLanguage},
+		"serbian scripts, other direction":   {"sr-Latn", "sr-Cyrl", langtag.TierSameLanguage},
 
 		// Tier 2: one language, different script.
 		"simplified vs traditional chinese":          {"zh-Hans", "zh-Hant", langtag.TierOtherScript},
 		"traditional vs simplified chinese":          {"zh-Hant", "zh-Hans", langtag.TierOtherScript},
-		"serbian scripts":                            {"sr-Cyrl", "sr-Latn", langtag.TierOtherScript},
 		"uzbek scripts":                              {"uz-Latn", "uz-Cyrl", langtag.TierOtherScript},
 		"mandarin traditional vs chinese simplified": {"cmn-Hant", "zh-Hans", langtag.TierOtherScript},
 

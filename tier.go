@@ -7,13 +7,10 @@ package langtag
 // the same language, then the same language in another script, then a close
 // language, then a language readers merely happen to be schooled in. It is
 // deliberately NOT a reading-difficulty scale, and reading difficulty is not
-// monotonic along it. [TierOtherScript] is the exception worth knowing: CLDR
-// rates sr-Latn against sr-Cyrl at distance 5, but has no entry for zh-Hans
-// against zh-Hant, which therefore falls through to its generic cross-script
-// distance of 50, farther than any pair on the two tiers above. So a script
-// substitution can be a bigger ask than a close-language one, even though it
-// sits lower. A caller serving Chinese content should weigh that before
-// accepting TierOtherScript.
+// monotonic along it. [TierOtherScript] is where that shows: what remains on it
+// is the script pairs CLDR does not explicitly rate, which it scores at 50,
+// farther than any pair on the two tiers above. A caller serving Chinese content
+// should weigh that before accepting TierOtherScript.
 //
 // Tiers 0 through 2 follow from published standards data and hold no opinion.
 // The two tiers above them are curated judgments, and they are separated
@@ -30,15 +27,20 @@ const (
 	// no, ger and deu, chi and zho, iw and he.
 	TierIdentical Tier = iota
 
-	// TierSameLanguage means one language, written the same way, differing at
-	// most in region. It covers macrolanguage folding (nob against nor, cmn
-	// against zho) and regional variants (es-ES against es-419, pt-BR against
-	// pt-PT, en-GB against en-US). Reading is unaffected.
+	// TierSameLanguage means one language a reader takes in without effort. It
+	// covers macrolanguage folding (nob against nor, cmn against zho), regional
+	// variants (es-ES against es-419, pt-BR against pt-PT, en-GB against en-US),
+	// and the script pairs whose readers are taught both, which is Serbian
+	// Latin against Serbian Cyrillic (see [CloseScripts]).
 	TierSameLanguage
 
-	// TierOtherScript means one language written in a different script:
-	// zh-Hans against zh-Hant, sr-Cyrl against sr-Latn, uz-Latn against
-	// uz-Cyrl. Readers of one generally manage the other, with effort.
+	// TierOtherScript means one language in a script its readers are NOT
+	// generally taught alongside: Simplified against Traditional Chinese,
+	// uz-Latn against uz-Cyrl. Readers of one usually manage the other, with
+	// effort. The pairs CLDR explicitly rates as close sit on the tier below
+	// instead, so what remains here is the set CLDR does not vouch for, which
+	// it scores at 50 against 4 to 20 for every curated close-language pair.
+	// That is why this tier can be a bigger ask than the two above it.
 	TierOtherScript
 
 	// TierIntelligible means two different languages that readers move between

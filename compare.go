@@ -172,8 +172,10 @@ func (c *Comparer) Compare(want, have Tag) Tier {
 	if want.macroBase == have.macroBase {
 		// One language. Either it is written the same way and only the region
 		// differs, which changes nothing for a reader, or the script differs,
-		// which is real work.
-		if want.script == have.script {
+		// which is usually real work. The exception is a language written in two
+		// scripts whose readers are taught both, which is no barrier at all.
+		if want.script == have.script ||
+			scriptsReadAsOne(want.macroBase, want.script, have.script) {
 			return TierSameLanguage
 		}
 		return TierOtherScript
