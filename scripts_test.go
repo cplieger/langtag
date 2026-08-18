@@ -3,7 +3,7 @@ package langtag_test
 import (
 	"testing"
 
-	"github.com/cplieger/langtag"
+	"github.com/cplieger/langtag/v2"
 )
 
 // TestCloseScriptsPromoteOnlyWhatCLDRVouchesFor pins the one item moved between
@@ -20,8 +20,8 @@ func TestCloseScriptsPromoteOnlyWhatCLDRVouchesFor(t *testing.T) {
 		t.Parallel()
 		a, b := langtag.MustParse("sr-Latn"), langtag.MustParse("sr-Cyrl")
 		for _, pair := range [][2]langtag.Tag{{a, b}, {b, a}} {
-			if got := langtag.Compare(pair[0], pair[1]); got != langtag.TierSameLanguage {
-				t.Errorf("Compare(%q, %q) = %v, want %v; readers are taught both scripts",
+			if got := langtag.Prefer(pair[0]).Compare(pair[1]); got != langtag.TierSameLanguage {
+				t.Errorf("Prefer(%q).Compare(%q) = %v, want %v; readers are taught both scripts",
 					pair[0], pair[1], got, langtag.TierSameLanguage)
 			}
 		}
@@ -57,8 +57,8 @@ func TestCloseScriptsPromoteOnlyWhatCLDRVouchesFor(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			a, b := langtag.MustParse(tc.a), langtag.MustParse(tc.b)
-			if got := langtag.Compare(a, b); got != langtag.TierOtherScript {
-				t.Errorf("Compare(%q, %q) = %v, want %v: %s",
+			if got := langtag.Prefer(a).Compare(b); got != langtag.TierOtherScript {
+				t.Errorf("Prefer(%q).Compare(%q) = %v, want %v: %s",
 					tc.a, tc.b, got, langtag.TierOtherScript, tc.why)
 			}
 		})
@@ -73,8 +73,8 @@ func TestCloseScriptsStayWithinOneLanguage(t *testing.T) {
 	// they are where a leak would show first.
 	sr := langtag.MustParse("sr-Latn")
 	for _, other := range []string{"hr", "bs", "sl", "mk"} {
-		if got := langtag.Compare(sr, langtag.MustParse(other)); got != langtag.TierNone {
-			t.Errorf("Compare(sr-Latn, %q) = %v, want %v; a script promotion must not bridge languages",
+		if got := langtag.Prefer(sr).Compare(langtag.MustParse(other)); got != langtag.TierNone {
+			t.Errorf("Prefer(sr-Latn).Compare(%q) = %v, want %v; a script promotion must not bridge languages",
 				other, got, langtag.TierNone)
 		}
 	}

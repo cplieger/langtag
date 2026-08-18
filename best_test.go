@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cplieger/langtag"
+	"github.com/cplieger/langtag/v2"
 )
 
 // track models a caller's own candidate type, to exercise that Best works
@@ -93,15 +93,15 @@ func TestBest(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got, tier, ok := langtag.Best(
-				langtag.MustParse(tc.want), tracks(t, tc.available...), trackLang, tc.floor)
+				langtag.Prefer(langtag.MustParse(tc.want)), tracks(t, tc.available...), trackLang, tc.floor)
 			if ok != tc.ok {
-				t.Fatalf("Best(%q, %v, %v) ok = %v, want %v", tc.want, tc.available, tc.floor, ok, tc.ok)
+				t.Fatalf("Best(Prefer(%q), %v, %v) ok = %v, want %v", tc.want, tc.available, tc.floor, ok, tc.ok)
 			}
 			if tier != tc.tier {
-				t.Errorf("Best(%q, %v, %v) tier = %v, want %v", tc.want, tc.available, tc.floor, tier, tc.tier)
+				t.Errorf("Best(Prefer(%q), %v, %v) tier = %v, want %v", tc.want, tc.available, tc.floor, tier, tc.tier)
 			}
 			if gotNames := names(got); !slices.Equal(gotNames, tc.picked) {
-				t.Errorf("Best(%q, %v, %v) picked %v, want %v",
+				t.Errorf("Best(Prefer(%q), %v, %v) picked %v, want %v",
 					tc.want, tc.available, tc.floor, gotNames, tc.picked)
 			}
 		})
@@ -117,15 +117,15 @@ func TestBestSkipsUnparsedCandidates(t *testing.T) {
 		{name: "untagged", lang: langtag.Tag{}},
 		{name: "nor", lang: langtag.MustParse("nor")},
 	}
-	got, tier, ok := langtag.Best(langtag.MustParse("nob"), candidates, trackLang, langtag.TierSameLanguage)
+	got, tier, ok := langtag.Best(langtag.Prefer(langtag.MustParse("nob")), candidates, trackLang, langtag.TierSameLanguage)
 	if !ok {
-		t.Fatal("Best(nob, [untagged nor], same-language) ok = false, want true")
+		t.Fatal("Best(Prefer(nob), [untagged nor], same-language) ok = false, want true")
 	}
 	if tier != langtag.TierSameLanguage {
-		t.Errorf("Best(nob, [untagged nor], same-language) tier = %v, want %v", tier, langtag.TierSameLanguage)
+		t.Errorf("Best(Prefer(nob), [untagged nor], same-language) tier = %v, want %v", tier, langtag.TierSameLanguage)
 	}
 	if gotNames := names(got); !slices.Equal(gotNames, []string{"nor"}) {
-		t.Errorf("Best(nob, [untagged nor], same-language) picked %v, want [nor]", gotNames)
+		t.Errorf("Best(Prefer(nob), [untagged nor], same-language) picked %v, want [nor]", gotNames)
 	}
 }
 
@@ -135,9 +135,9 @@ func TestBestSkipsUnparsedCandidates(t *testing.T) {
 func TestBestCapsFloorAtSensitive(t *testing.T) {
 	t.Parallel()
 	got, tier, ok := langtag.Best(
-		langtag.MustParse("nob"), tracks(t, "swe", "eng"), trackLang, langtag.TierNone)
+		langtag.Prefer(langtag.MustParse("nob")), tracks(t, "swe", "eng"), trackLang, langtag.TierNone)
 	if ok {
-		t.Errorf("Best(nob, [swe eng], none) = (%v, %v, true), want ok=false", names(got), tier)
+		t.Errorf("Best(Prefer(nob), [swe eng], none) = (%v, %v, true), want ok=false", names(got), tier)
 	}
 }
 
@@ -145,12 +145,12 @@ func TestWithFallbacksNilDisablesTierThree(t *testing.T) {
 	t.Parallel()
 	c := langtag.WithFallbacks(nil)
 	nob, nn := langtag.MustParse("nob"), langtag.MustParse("nn")
-	if got := c.Compare(nob, nn); got != langtag.TierNone {
-		t.Errorf("WithFallbacks(nil).Compare(nob, nn) = %v, want %v", got, langtag.TierNone)
+	if got := c.Prefer(nob).Compare(nn); got != langtag.TierNone {
+		t.Errorf("WithFallbacks(nil).Prefer(nob).Compare(nn) = %v, want %v", got, langtag.TierNone)
 	}
 	// Tiers 0 to 2 are structural and must be unaffected by the table.
-	if got := c.Compare(nob, langtag.MustParse("nor")); got != langtag.TierSameLanguage {
-		t.Errorf("WithFallbacks(nil).Compare(nob, nor) = %v, want %v", got, langtag.TierSameLanguage)
+	if got := c.Prefer(nob).Compare(langtag.MustParse("nor")); got != langtag.TierSameLanguage {
+		t.Errorf("WithFallbacks(nil).Prefer(nob).Compare(nor) = %v, want %v", got, langtag.TierSameLanguage)
 	}
 }
 
@@ -160,15 +160,15 @@ func TestWithFallbacksCustomTable(t *testing.T) {
 		{Want: "sv", Have: "no", Reason: "test-only claim", Kind: langtag.Intelligible, Both: true},
 	})
 	sv, no := langtag.MustParse("sv"), langtag.MustParse("no")
-	if got := c.Compare(sv, no); got != langtag.TierIntelligible {
-		t.Errorf("custom Compare(sv, no) = %v, want %v", got, langtag.TierIntelligible)
+	if got := c.Prefer(sv).Compare(no); got != langtag.TierIntelligible {
+		t.Errorf("custom Prefer(sv).Compare(no) = %v, want %v", got, langtag.TierIntelligible)
 	}
-	if got := c.Compare(no, sv); got != langtag.TierIntelligible {
-		t.Errorf("custom Compare(no, sv) = %v, want %v (a symmetric entry runs both ways)", got, langtag.TierIntelligible)
+	if got := c.Prefer(no).Compare(sv); got != langtag.TierIntelligible {
+		t.Errorf("custom Prefer(no).Compare(sv) = %v, want %v (a symmetric entry runs both ways)", got, langtag.TierIntelligible)
 	}
 	// A custom table replaces the built-in one rather than extending it.
-	if got := c.Compare(langtag.MustParse("nb"), langtag.MustParse("nn")); got != langtag.TierNone {
-		t.Errorf("custom Compare(nb, nn) = %v, want %v (built-in entries must not leak in)", got, langtag.TierNone)
+	if got := c.Prefer(langtag.MustParse("nb")).Compare(langtag.MustParse("nn")); got != langtag.TierNone {
+		t.Errorf("custom Prefer(nb).Compare(nn) = %v, want %v (built-in entries must not leak in)", got, langtag.TierNone)
 	}
 }
 
@@ -182,29 +182,29 @@ func TestWithFallbacksIgnoresDegenerateEntries(t *testing.T) {
 		{Want: "", Have: "es", Reason: "blank want", Kind: langtag.Intelligible, Both: true},
 		{Want: "ca", Have: "", Reason: "blank have", Kind: langtag.SharedLiteracy},
 	})
-	if got := c.Compare(langtag.MustParse("en"), langtag.MustParse("en")); got != langtag.TierIdentical {
-		t.Errorf("Compare(en, en) = %v, want %v", got, langtag.TierIdentical)
+	if got := c.Prefer(langtag.MustParse("en")).Compare(langtag.MustParse("en")); got != langtag.TierIdentical {
+		t.Errorf("Prefer(en).Compare(en) = %v, want %v", got, langtag.TierIdentical)
 	}
-	if got := c.Compare(langtag.MustParse("ca"), langtag.MustParse("es")); got != langtag.TierNone {
-		t.Errorf("Compare(ca, es) with only degenerate entries = %v, want %v", got, langtag.TierNone)
+	if got := c.Prefer(langtag.MustParse("ca")).Compare(langtag.MustParse("es")); got != langtag.TierNone {
+		t.Errorf("Prefer(ca).Compare(es) with only degenerate entries = %v, want %v", got, langtag.TierNone)
 	}
 }
 
 func TestReason(t *testing.T) {
 	t.Parallel()
 	ca, es := langtag.MustParse("ca"), langtag.MustParse("es")
-	got, ok := langtag.Reason(ca, es)
+	got, ok := langtag.Prefer(ca).Reason(es)
 	if !ok {
-		t.Fatal("Reason(ca, es) ok = false, want true")
+		t.Fatal("Prefer(ca).Reason(es) ok = false, want true")
 	}
 	if got == "" {
-		t.Error("Reason(ca, es) = \"\", want a justification")
+		t.Error("Prefer(ca).Reason(es) = \"\", want a justification")
 	}
-	if _, ok := langtag.Reason(es, ca); ok {
-		t.Error("Reason(es, ca) ok = true, want false (the entry is one-way)")
+	if _, ok := langtag.Prefer(es).Reason(ca); ok {
+		t.Error("Prefer(es).Reason(ca) ok = true, want false (the entry is one-way)")
 	}
-	if _, ok := langtag.Reason(langtag.MustParse("nob"), langtag.MustParse("nor")); ok {
-		t.Error("Reason(nob, nor) ok = true, want false (tier 1 is structural, not a judgment)")
+	if _, ok := langtag.Prefer(langtag.MustParse("nob")).Reason(langtag.MustParse("nor")); ok {
+		t.Error("Prefer(nob).Reason(nor) ok = true, want false (tier 1 is structural, not a judgment)")
 	}
 }
 

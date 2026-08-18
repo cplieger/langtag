@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/langtag"
+	"github.com/cplieger/langtag/v2"
 )
 
 func TestParse(t *testing.T) {
@@ -124,11 +124,11 @@ func TestParseUndeterminedDoesNotInferEnglish(t *testing.T) {
 		t.Fatalf("Parse(%q) = (%q, true), want ok=false", "und", got.Language())
 	}
 	english := langtag.MustParse("en")
-	if tier := langtag.Compare(english, got); tier != langtag.TierNone {
-		t.Errorf("Compare(en, und) = %v, want %v", tier, langtag.TierNone)
+	if tier := langtag.Prefer(english).Compare(got); tier != langtag.TierNone {
+		t.Errorf("Prefer(en).Compare(und) = %v, want %v", tier, langtag.TierNone)
 	}
-	if tier := langtag.Compare(got, english); tier != langtag.TierNone {
-		t.Errorf("Compare(und, en) = %v, want %v", tier, langtag.TierNone)
+	if tier := langtag.Prefer(got).Compare(english); tier != langtag.TierNone {
+		t.Errorf("Prefer(und).Compare(en) = %v, want %v", tier, langtag.TierNone)
 	}
 }
 
@@ -143,15 +143,15 @@ func TestZeroTagMatchesNothing(t *testing.T) {
 	}
 	// Two unknown tracks are not known to share a language, so even a zero Tag
 	// against itself must not match.
-	if tier := langtag.Compare(zero, zero); tier != langtag.TierNone {
-		t.Errorf("Compare(zero, zero) = %v, want %v", tier, langtag.TierNone)
+	if tier := langtag.Prefer(zero).Compare(zero); tier != langtag.TierNone {
+		t.Errorf("Prefer(zero).Compare(zero) = %v, want %v", tier, langtag.TierNone)
 	}
 	real := langtag.MustParse("en")
-	if tier := langtag.Compare(zero, real); tier != langtag.TierNone {
-		t.Errorf("Compare(zero, en) = %v, want %v", tier, langtag.TierNone)
+	if tier := langtag.Prefer(zero).Compare(real); tier != langtag.TierNone {
+		t.Errorf("Prefer(zero).Compare(en) = %v, want %v", tier, langtag.TierNone)
 	}
-	if tier := langtag.Compare(real, zero); tier != langtag.TierNone {
-		t.Errorf("Compare(en, zero) = %v, want %v", tier, langtag.TierNone)
+	if tier := langtag.Prefer(real).Compare(zero); tier != langtag.TierNone {
+		t.Errorf("Prefer(en).Compare(zero) = %v, want %v", tier, langtag.TierNone)
 	}
 }
 
@@ -200,8 +200,8 @@ func FuzzParse(f *testing.F) {
 			if !got.IsZero() {
 				t.Fatalf("Parse(%q) = (%q, false), want the zero Tag when ok is false", raw, got.String())
 			}
-			if tier := langtag.Compare(got, got); tier != langtag.TierNone {
-				t.Fatalf("Compare(zero, zero) after Parse(%q) = %v, want %v", raw, tier, langtag.TierNone)
+			if tier := langtag.Prefer(got).Compare(got); tier != langtag.TierNone {
+				t.Fatalf("Prefer(zero).Compare(zero) after Parse(%q) = %v, want %v", raw, tier, langtag.TierNone)
 			}
 			return
 		}
@@ -222,8 +222,8 @@ func FuzzParse(f *testing.F) {
 			t.Fatalf("Parse(%q) is not idempotent: first %+v, second %+v", raw, got, again)
 		}
 		// A tag always matches itself exactly, at every floor.
-		if tier := langtag.Compare(got, got); tier != langtag.TierIdentical {
-			t.Fatalf("Compare(x, x) for Parse(%q) = %v, want %v", raw, tier, langtag.TierIdentical)
+		if tier := langtag.Prefer(got).Compare(got); tier != langtag.TierIdentical {
+			t.Fatalf("Prefer(x).Compare(x) for Parse(%q) = %v, want %v", raw, tier, langtag.TierIdentical)
 		}
 	})
 }

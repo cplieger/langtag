@@ -3,7 +3,7 @@ package langtag_test
 import (
 	"testing"
 
-	"github.com/cplieger/langtag"
+	"github.com/cplieger/langtag/v2"
 )
 
 func TestCompare(t *testing.T) {
@@ -76,8 +76,8 @@ func TestCompare(t *testing.T) {
 			t.Parallel()
 			want := langtag.MustParse(tc.want)
 			have := langtag.MustParse(tc.have)
-			if got := langtag.Compare(want, have); got != tc.tier {
-				t.Errorf("Compare(%q, %q) = %v, want %v", tc.want, tc.have, got, tc.tier)
+			if got := langtag.Prefer(want).Compare(have); got != tc.tier {
+				t.Errorf("Prefer(%q).Compare(%q) = %v, want %v", tc.want, tc.have, got, tc.tier)
 			}
 		})
 	}
@@ -135,28 +135,29 @@ func TestCompareExcludesSharedLiteracy(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			a, b := langtag.MustParse(p[0]), langtag.MustParse(p[1])
-			if got := langtag.Compare(a, b); got != langtag.TierNone {
-				t.Errorf("Compare(%q, %q) = %v, want %v (shared literacy is not interchangeability)",
+			if got := langtag.Prefer(a).Compare(b); got != langtag.TierNone {
+				t.Errorf("Prefer(%q).Compare(%q) = %v, want %v (shared literacy is not interchangeability)",
 					p[0], p[1], got, langtag.TierNone)
 			}
-			if got := langtag.Compare(b, a); got != langtag.TierNone {
-				t.Errorf("Compare(%q, %q) = %v, want %v (shared literacy is not interchangeability)",
+			if got := langtag.Prefer(b).Compare(a); got != langtag.TierNone {
+				t.Errorf("Prefer(%q).Compare(%q) = %v, want %v (shared literacy is not interchangeability)",
 					p[1], p[0], got, langtag.TierNone)
 			}
 		})
 	}
 }
 
-// TestCompareIsDirected pins that the argument order is load-bearing, so the
-// asymmetry is a contract rather than an accident of the current table.
+// TestCompareIsDirected pins that the direction carried by the Preference role
+// is load-bearing, so the asymmetry is a contract rather than an accident of
+// the current table.
 func TestCompareIsDirected(t *testing.T) {
 	t.Parallel()
 	ca, es := langtag.MustParse("ca"), langtag.MustParse("es")
-	if got := langtag.Compare(ca, es); got != langtag.TierSharedLiteracy {
-		t.Errorf("Compare(ca, es) = %v, want %v (a Catalan reader reads Spanish)", got, langtag.TierSharedLiteracy)
+	if got := langtag.Prefer(ca).Compare(es); got != langtag.TierSharedLiteracy {
+		t.Errorf("Prefer(ca).Compare(es) = %v, want %v (a Catalan reader reads Spanish)", got, langtag.TierSharedLiteracy)
 	}
-	if got := langtag.Compare(es, ca); got != langtag.TierNone {
-		t.Errorf("Compare(es, ca) = %v, want %v (a Spanish reader does not read Catalan)", got, langtag.TierNone)
+	if got := langtag.Prefer(es).Compare(ca); got != langtag.TierNone {
+		t.Errorf("Prefer(es).Compare(ca) = %v, want %v (a Spanish reader does not read Catalan)", got, langtag.TierNone)
 	}
 }
 
@@ -183,8 +184,8 @@ func TestMatch(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			if got := langtag.Match(tc.want, tc.have, tc.floor); got != tc.match {
-				t.Errorf("Match(%q, %q, %v) = %v, want %v",
+			if got := langtag.Prefer(tc.want).Match(tc.have, tc.floor); got != tc.match {
+				t.Errorf("Prefer(%q).Match(%q, %v) = %v, want %v",
 					tc.want, tc.have, tc.floor, got, tc.match)
 			}
 		})
@@ -206,10 +207,11 @@ func TestMatchIsMonotonicInFloor(t *testing.T) {
 	}
 	for _, a := range tags {
 		for _, b := range tags {
-			want, have := langtag.MustParse(a), langtag.MustParse(b)
+			p := langtag.Prefer(langtag.MustParse(a))
+			have := langtag.MustParse(b)
 			matchedAt := -1
 			for i, floor := range floors {
-				if langtag.Match(want, have, floor) {
+				if p.Match(have, floor) {
 					matchedAt = i
 					break
 				}
@@ -218,8 +220,8 @@ func TestMatchIsMonotonicInFloor(t *testing.T) {
 				continue
 			}
 			for _, floor := range floors[matchedAt:] {
-				if !langtag.Match(want, have, floor) {
-					t.Errorf("Match(%q, %q, %v) = false, want true (accepted at %v, so every looser floor must accept)",
+				if !p.Match(have, floor) {
+					t.Errorf("Prefer(%q).Match(%q, %v) = false, want true (accepted at %v, so every looser floor must accept)",
 						a, b, floor, floors[matchedAt])
 				}
 			}

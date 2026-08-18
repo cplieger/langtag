@@ -56,6 +56,18 @@ func (k Kind) String() string {
 // value [Tag.Language] reports. One entry therefore covers every spelling of
 // the languages it names: a Want of "no" answers for nor, nob, no and nb
 // alike, and no second entry is needed for the umbrella tag.
+//
+// Want and Have are both bare language subtags, so a table author CAN write
+// them in the wrong order and no type will object — the same directional
+// hazard [Preference] removes at comparison sites. What catches an authoring
+// swap is the validation seam plus review: ValidateFallbacks rejects the
+// mechanical mistakes (empty side, same-language pair, Kind/Both mismatch),
+// the Reason field forces every entry to carry its argument in the direction
+// it claims, and the provenance test keeps each claim checkable against CLDR.
+// A swapped pair whose Reason reads backwards is the review's to catch; typed
+// roles were considered and rejected here because a table LITERAL with named
+// fields (the only way entries are written) already shows both role names at
+// every site.
 type Fallback struct {
 	// Want is the language subtag a reader asked for.
 	Want string
