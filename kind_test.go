@@ -3,7 +3,7 @@ package langtag_test
 import (
 	"testing"
 
-	"github.com/cplieger/langtag"
+	"github.com/cplieger/langtag/v2"
 )
 
 // TestIntelligibleFloorAdmitsNoSharedLiteracy is the test that makes the
@@ -22,12 +22,12 @@ func TestIntelligibleFloorAdmitsNoSharedLiteracy(t *testing.T) {
 			continue
 		}
 		want, have := langtag.MustParse(f.Want), langtag.MustParse(f.Have)
-		if langtag.Match(want, have, langtag.TierIntelligible) {
-			t.Errorf("Match(%q, %q, intelligible) = true, want false; %q is a shared-literacy entry and must need its own opt-in",
+		if langtag.Prefer(want).Match(have, langtag.TierIntelligible) {
+			t.Errorf("Prefer(%q).Match(%q, intelligible) = true, want false; %q is a shared-literacy entry and must need its own opt-in",
 				f.Want, f.Have, f.Want+"->"+f.Have)
 		}
-		if !langtag.Match(want, have, langtag.TierSharedLiteracy) {
-			t.Errorf("Match(%q, %q, shared-literacy) = false, want true", f.Want, f.Have)
+		if !langtag.Prefer(want).Match(have, langtag.TierSharedLiteracy) {
+			t.Errorf("Prefer(%q).Match(%q, shared-literacy) = false, want true", f.Want, f.Have)
 		}
 	}
 }
@@ -65,11 +65,11 @@ func TestSharedLiteracyIsOneWay(t *testing.T) {
 		{Want: "ca", Have: "es", Kind: langtag.SharedLiteracy, Reason: "test"},
 	})
 	ca, es := langtag.MustParse("ca"), langtag.MustParse("es")
-	if got := c.Compare(ca, es); got != langtag.TierSharedLiteracy {
-		t.Errorf("Compare(ca, es) = %v, want %v", got, langtag.TierSharedLiteracy)
+	if got := c.Prefer(ca).Compare(es); got != langtag.TierSharedLiteracy {
+		t.Errorf("Prefer(ca).Compare(es) = %v, want %v", got, langtag.TierSharedLiteracy)
 	}
-	if got := c.Compare(es, ca); got != langtag.TierNone {
-		t.Errorf("Compare(es, ca) = %v, want %v (a shared-literacy claim is not reciprocated)",
+	if got := c.Prefer(es).Compare(ca); got != langtag.TierNone {
+		t.Errorf("Prefer(es).Compare(ca) = %v, want %v (a shared-literacy claim is not reciprocated)",
 			got, langtag.TierNone)
 	}
 }
@@ -99,8 +99,8 @@ func TestMalformedFallbacksAreDropped(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c := langtag.WithFallbacks([]langtag.Fallback{f})
-			if got := c.Compare(sv, no); got != langtag.TierNone {
-				t.Errorf("Compare(sv, no) with a malformed entry = %v, want %v", got, langtag.TierNone)
+			if got := c.Prefer(sv).Compare(no); got != langtag.TierNone {
+				t.Errorf("Prefer(sv).Compare(no) with a malformed entry = %v, want %v", got, langtag.TierNone)
 			}
 			if errs := langtag.ValidateFallbacks([]langtag.Fallback{f}); len(errs) != 1 {
 				t.Errorf("ValidateFallbacks returned %d errors, want 1: %v", len(errs), errs)
@@ -128,17 +128,17 @@ func TestUnusableFloorSelectsNothing(t *testing.T) {
 	var zero langtag.Tag
 
 	for _, floor := range []langtag.Tier{langtag.TierNone, langtag.Tier(99)} {
-		if langtag.Match(ta, en, floor) {
-			t.Errorf("Match(ta, en, %v) = true, want false", floor)
+		if langtag.Prefer(ta).Match(en, floor) {
+			t.Errorf("Prefer(ta).Match(en, %v) = true, want false", floor)
 		}
-		if langtag.Match(zero, zero, floor) {
-			t.Errorf("Match(zero, zero, %v) = true, want false", floor)
+		if langtag.Prefer(zero).Match(zero, floor) {
+			t.Errorf("Prefer(zero).Match(zero, %v) = true, want false", floor)
 		}
-		got, tier, ok := langtag.Best(langtag.MustParse("ca"),
+		got, tier, ok := langtag.Best(langtag.Prefer(langtag.MustParse("ca")),
 			[]langtag.Tag{langtag.MustParse("es")},
 			func(t langtag.Tag) langtag.Tag { return t }, floor)
 		if ok {
-			t.Errorf("Best(ca, [es], %v) = (%v, %v, true), want ok=false; an unusable floor must not widen to the most permissive tier",
+			t.Errorf("Best(Prefer(ca), [es], %v) = (%v, %v, true), want ok=false; an unusable floor must not widen to the most permissive tier",
 				floor, got, tier)
 		}
 	}
@@ -152,8 +152,55 @@ func TestMistypedTierFailsClosed(t *testing.T) {
 	if ok {
 		t.Fatalf("ParseTier(%q) ok = true, want false", "looose")
 	}
-	if langtag.Match(langtag.MustParse("ta"), langtag.MustParse("en"), floor) {
+	if langtag.Prefer(langtag.MustParse("ta")).Match(langtag.MustParse("en"), floor) {
 		t.Error("a caller that ignored ParseTier's ok value got a floor that matches everything, want one that matches nothing")
+	}
+}
+
+// TestZeroPreferenceFailsClosed pins the zero value's documented contract. A
+// Preference nobody constructed prefers the zero Tag, so it must answer
+// TierNone everywhere, explain nothing, and select nothing — without
+// panicking, because every method checks the nil table before touching it
+// (the zero Tag short-circuit alone would also refuse, but the nil check is
+// what makes the refusal hold for a REAL want bound to a nil table below).
+func TestZeroPreferenceFailsClosed(t *testing.T) {
+	t.Parallel()
+	var p langtag.Preference
+	en := langtag.MustParse("en")
+	if got := p.Compare(en); got != langtag.TierNone {
+		t.Errorf("zero Preference: Compare(en) = %v, want %v", got, langtag.TierNone)
+	}
+	if _, ok := p.Reason(en); ok {
+		t.Error("zero Preference: Reason(en) ok = true, want false")
+	}
+	if p.Match(en, langtag.TierSharedLiteracy) {
+		t.Error("zero Preference: Match(en, shared-literacy) = true, want false")
+	}
+	got, tier, ok := langtag.Best(p, []langtag.Tag{en},
+		func(t langtag.Tag) langtag.Tag { return t }, langtag.TierSharedLiteracy)
+	if ok {
+		t.Errorf("Best(zero Preference, [en], shared-literacy) = (%v, %v, true), want ok=false", got, tier)
+	}
+}
+
+// A nil *Comparer must fail CLOSED: a Preference bound to a nil table judges
+// nothing acceptable, rather than silently inheriting the built-in table.
+// Inheriting would be a widening — the exact direction every fail-open bug in
+// this library's history took — triggered by nothing louder than a nil field.
+func TestNilComparerPreferenceFailsClosed(t *testing.T) {
+	t.Parallel()
+	var c *langtag.Comparer
+	p := c.Prefer(langtag.MustParse("nb")) // a REAL want; only the table is nil
+	nn := langtag.MustParse("nn")
+	if got := p.Compare(nn); got != langtag.TierNone {
+		t.Errorf("nil-Comparer Preference: Compare(nn) = %v, want %v (must not inherit the built-in table, which grades nb/nn %v)",
+			got, langtag.TierNone, langtag.TierIntelligible)
+	}
+	if _, ok := p.Reason(nn); ok {
+		t.Error("nil-Comparer Preference: Reason(nn) ok = true, want false")
+	}
+	if p.Match(nn, langtag.TierIntelligible) {
+		t.Error("nil-Comparer Preference: Match(nn, intelligible) = true, want false")
 	}
 }
 
@@ -219,8 +266,8 @@ func TestExcludedFamilyStaysOutAtEveryFloor(t *testing.T) {
 	} {
 		for _, p := range pairs {
 			a, b := langtag.MustParse(p[0]), langtag.MustParse(p[1])
-			if langtag.Match(a, b, floor) {
-				t.Errorf("Match(%q, %q, %v) = true, want false; this pair is not in the table at any tier",
+			if langtag.Prefer(a).Match(b, floor) {
+				t.Errorf("Prefer(%q).Match(%q, %v) = true, want false; this pair is not in the table at any tier",
 					p[0], p[1], floor)
 			}
 		}
@@ -245,8 +292,8 @@ func TestConflictingEntriesKeepTheFartherTier(t *testing.T) {
 	for _, order := range [][]langtag.Fallback{table, {table[1], table[0]}} {
 		c := langtag.WithFallbacks(order)
 		ca, es := langtag.MustParse("ca"), langtag.MustParse("es")
-		if got := c.Compare(ca, es); got != langtag.TierSharedLiteracy {
-			t.Errorf("Compare(ca, es) = %v, want %v; the farther tier must win regardless of table order",
+		if got := c.Prefer(ca).Compare(es); got != langtag.TierSharedLiteracy {
+			t.Errorf("Prefer(ca).Compare(es) = %v, want %v; the farther tier must win regardless of table order",
 				got, langtag.TierSharedLiteracy)
 		}
 	}
@@ -259,22 +306,22 @@ func TestConflictingEntriesKeepTheFartherTier(t *testing.T) {
 // TestComparerMatchHonorsTheFloorContract covers the gap a diff review found: a
 // caller using a custom table reached Compare but had no Match, so it had to
 // re-implement the floor comparison and would re-inherit the fail-open bug that
-// the package-level Match had already been fixed for.
+// the built-in-table Match had already been fixed for.
 func TestComparerMatchHonorsTheFloorContract(t *testing.T) {
 	t.Parallel()
 	c := langtag.WithFallbacks(langtag.Fallbacks())
 	nob, nn := langtag.MustParse("nob"), langtag.MustParse("nn")
 	ta, en := langtag.MustParse("ta"), langtag.MustParse("en")
 
-	if !c.Match(nob, nn, langtag.TierIntelligible) {
-		t.Error("Comparer.Match(nob, nn, intelligible) = false, want true")
+	if !c.Prefer(nob).Match(nn, langtag.TierIntelligible) {
+		t.Error("Comparer.Prefer(nob).Match(nn, intelligible) = false, want true")
 	}
-	if c.Match(nob, nn, langtag.TierOtherScript) {
-		t.Error("Comparer.Match(nob, nn, other-script) = true, want false")
+	if c.Prefer(nob).Match(nn, langtag.TierOtherScript) {
+		t.Error("Comparer.Prefer(nob).Match(nn, other-script) = true, want false")
 	}
 	for _, floor := range []langtag.Tier{langtag.TierNone, langtag.Tier(99)} {
-		if c.Match(ta, en, floor) {
-			t.Errorf("Comparer.Match(ta, en, %v) = true, want false; an unusable floor must match nothing", floor)
+		if c.Prefer(ta).Match(en, floor) {
+			t.Errorf("Comparer.Prefer(ta).Match(en, %v) = true, want false; an unusable floor must match nothing", floor)
 		}
 	}
 }

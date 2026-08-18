@@ -3,7 +3,7 @@ package langtag_test
 import (
 	"fmt"
 
-	"github.com/cplieger/langtag"
+	"github.com/cplieger/langtag/v2"
 )
 
 // One language spelled two ways is one language.
@@ -21,11 +21,11 @@ func ExampleParse() {
 }
 
 // Compare grades the distance rather than answering yes or no.
-func ExampleCompare() {
-	want := langtag.MustParse("nob")
+func ExamplePreference_Compare() {
+	p := langtag.Prefer(langtag.MustParse("nob"))
 	for _, raw := range []string{"nob", "nor", "nn", "sv"} {
 		have := langtag.MustParse(raw)
-		fmt.Printf("a viewer wanting nob, offered %-4s: %s\n", raw, langtag.Compare(want, have))
+		fmt.Printf("a viewer wanting nob, offered %-4s: %s\n", raw, p.Compare(have))
 	}
 	// Output:
 	// a viewer wanting nob, offered nob : identical
@@ -34,12 +34,14 @@ func ExampleCompare() {
 	// a viewer wanting nob, offered sv  : none
 }
 
-// Tier-3 relationships are directed, because shared literacy usually runs one
-// way: Catalan readers read Spanish, and Spanish readers do not read Catalan.
-func ExampleCompare_directed() {
+// Cross-language relationships are directed, because shared literacy usually
+// runs one way: Catalan readers read Spanish, and Spanish readers do not read
+// Catalan. The Preference carries the direction: whoever was named in Prefer
+// is the one doing the choosing.
+func ExamplePreference_Compare_directed() {
 	ca, es := langtag.MustParse("ca"), langtag.MustParse("es")
-	fmt.Println("wanting ca, offered es:", langtag.Compare(ca, es))
-	fmt.Println("wanting es, offered ca:", langtag.Compare(es, ca))
+	fmt.Println("wanting ca, offered es:", langtag.Prefer(ca).Compare(es))
+	fmt.Println("wanting es, offered ca:", langtag.Prefer(es).Compare(ca))
 	// Output:
 	// wanting ca, offered es: shared-literacy
 	// wanting es, offered ca: none
@@ -59,7 +61,7 @@ func ExampleBest() {
 		{"ep2.nor.srt", "srt", langtag.MustParse("nor")},
 		{"ep2.swe.srt", "srt", langtag.MustParse("swe")},
 	}
-	want := langtag.MustParse("nob") // the viewer chose Bokmål on episode 1
+	want := langtag.Prefer(langtag.MustParse("nob")) // the viewer chose Bokmål on episode 1
 
 	matches, tier, ok := langtag.Best(want, available,
 		func(s subtitle) langtag.Tag { return s.lang },
@@ -79,19 +81,20 @@ func ExampleBest() {
 }
 
 // A floor keeps a caller from reaching further than it intends.
-func ExampleMatch() {
-	want := langtag.MustParse("zh-Hans")
+func ExamplePreference_Match() {
+	p := langtag.Prefer(langtag.MustParse("zh-Hans"))
 	have := langtag.MustParse("zh-Hant")
-	fmt.Println("at same-language:", langtag.Match(want, have, langtag.TierSameLanguage))
-	fmt.Println("at other-script: ", langtag.Match(want, have, langtag.TierOtherScript))
+	fmt.Println("at same-language:", p.Match(have, langtag.TierSameLanguage))
+	fmt.Println("at other-script: ", p.Match(have, langtag.TierOtherScript))
 	// Output:
 	// at same-language: false
 	// at other-script:  true
 }
 
-// Reason explains a tier-3 substitution, so a surprised user can be told why.
-func ExampleReason() {
-	reason, ok := langtag.Reason(langtag.MustParse("nb"), langtag.MustParse("da"))
+// Reason explains a cross-language substitution, so a surprised user can be
+// told why.
+func ExamplePreference_Reason() {
+	reason, ok := langtag.Prefer(langtag.MustParse("nb")).Reason(langtag.MustParse("da"))
 	fmt.Println(ok)
 	fmt.Println(reason)
 	// Output:
@@ -104,8 +107,8 @@ func ExampleReason() {
 func ExampleWithFallbacks() {
 	strict := langtag.WithFallbacks(nil)
 	nb, nn := langtag.MustParse("nb"), langtag.MustParse("nn")
-	fmt.Println("built-in:", langtag.Compare(nb, nn))
-	fmt.Println("no table:", strict.Compare(nb, nn))
+	fmt.Println("built-in:", langtag.Prefer(nb).Compare(nn))
+	fmt.Println("no table:", strict.Prefer(nb).Compare(nn))
 	// Output:
 	// built-in: intelligible
 	// no table: none

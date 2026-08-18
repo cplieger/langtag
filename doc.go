@@ -19,16 +19,23 @@
 //
 // # Distance is graded, not binary
 //
-// [Compare] reports a [Tier]: how far a candidate sits from what was wanted.
-// Tiers 0 through 2 are derived from published standards data. The two above
-// them are curated judgments, split because they make different claims:
-// [TierIntelligible] says two languages are close enough to read across, and
-// [TierSharedLiteracy] says only that readers of one are broadly literate in
-// the other. A caller sets a floor and nothing beyond it is a match.
+// [Preference.Compare] reports a [Tier]: how far a candidate sits from what
+// was wanted. Tiers 0 through 2 are derived from published standards data. The
+// two above them are curated judgments, split because they make different
+// claims: [TierIntelligible] says two languages are close enough to read
+// across, and [TierSharedLiteracy] says only that readers of one are broadly
+// literate in the other. A caller sets a floor and nothing beyond it is a
+// match.
 //
 //	want, _ := langtag.Parse("nob")
 //	have, _ := langtag.Parse("nor")
-//	langtag.Compare(want, have) // TierSameLanguage
+//	langtag.Prefer(want).Compare(have) // TierSameLanguage
+//
+// Cross-language relationships are directed — a Catalan viewer accepts a
+// Spanish track, and a Spanish viewer does not accept a Catalan one — and the
+// direction is carried by the [Preference] role: [Prefer] names the language a
+// person chose, so p.Compare(have) reads as the person's choice judging the
+// offer, and no comparison site holds two tags whose order could be swapped.
 //
 // # What this package deliberately will not do
 //

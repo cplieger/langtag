@@ -2,9 +2,10 @@ package langtag
 
 import "fmt"
 
-// Comparer answers tier questions against a specific fallback table. Use it
-// when the built-in cross-language judgments do not suit the deployment; the
-// package-level [Compare], [Match] and [Best] use the built-in table.
+// Comparer holds the fallback table a [Preference] is judged against. Use one
+// when the built-in cross-language judgments do not suit the deployment: build
+// it with [WithFallbacks], then bind a wanted language to it with
+// [Comparer.Prefer]. [Prefer] binds against the built-in table.
 //
 // A Comparer is immutable after construction and safe for concurrent use.
 type Comparer struct {
@@ -148,18 +149,145 @@ func fallbackError(e Fallback) string {
 	}
 }
 
-// Compare reports how far the available tag have sits from the wanted tag
-// want, using the built-in table.
+// Preference is the language a person chose, bound to the fallback table that
+// will judge substitutes for it. Construct one with [Prefer] for the built-in
+// table or [Comparer.Prefer] for a custom one, then ask it about whatever the
+// content offers.
 //
-// The argument order is load-bearing. Cross-language entries are directed, so
-// Compare(want, have) and Compare(have, want) can differ: a Catalan viewer
-// accepts a Spanish track, and a Spanish viewer does not accept a Catalan one.
-// want is always the language a person chose; have is what the content offers.
-func Compare(want, have Tag) Tier { return defaultComparer.Compare(want, have) }
+// The construction carries the direction. Cross-language entries are directed
+// — a Catalan viewer accepts a Spanish track, and a Spanish viewer does not
+// accept a Catalan one — and two Tags side by side in an argument list can be
+// transposed without anything noticing. A Preference names the wanted side
+// once, at construction, so a comparison site has only one Tag to pass:
+// p.Compare(have) reads as the person's choice judging the offer. Two
+// preferences compared on adjacent lines can still be written in either
+// order — what the role buys is that a transposition is named and visible at
+// the site, not that it is impossible.
+//
+// The zero Preference is usable and fails closed. It prefers the zero Tag,
+// which names no language, so Compare answers [TierNone] for every input,
+// Reason answers ok=false, and Match and Best select nothing. The same
+// direction holds for a Preference built from a nil *Comparer: it judges
+// NOTHING acceptable, rather than silently inheriting the built-in table —
+// a nil table is a caller bug, and the widest table this package ships is
+// the one answer a bug must not receive.
+type Preference struct {
+	c    *Comparer
+	want Tag
+}
 
-// Compare reports how far the available tag have sits from the wanted tag
-// want. See the package-level [Compare] for the argument-order contract.
-func (c *Comparer) Compare(want, have Tag) Tier {
+// Prefer binds want, the language a person chose, to the built-in
+// cross-language table. Use [Comparer.Prefer] to judge against a custom table
+// instead.
+func Prefer(want Tag) Preference { return Preference{want: want, c: defaultComparer} }
+
+// Prefer binds want, the language a person chose, to this Comparer's table.
+func (c *Comparer) Prefer(want Tag) Preference { return Preference{want: want, c: c} }
+
+// Compare reports how far the available tag have sits from the preferred
+// language: the person's choice judging the offer. A Preference holding a nil
+// table (possible only through a nil *Comparer, since [Prefer] binds the
+// built-in one) answers [TierNone] for every input: fail closed, never widen.
+func (p Preference) Compare(have Tag) Tier {
+	if p.c == nil {
+		return TierNone
+	}
+	return p.c.compare(p.want, have)
+}
+
+// Reason returns the recorded justification for the cross-language
+// substitution that accepting have would be, and ok=false when the pair is not
+// one. Intended for explaining a surprising choice in a log line or a
+// user-facing message. A nil-table Preference answers ok=false for every
+// input, matching Compare's fail-closed direction.
+func (p Preference) Reason(have Tag) (string, bool) {
+	if p.c == nil {
+		return "", false
+	}
+	return p.c.reason(p.want, have)
+}
+
+// Match reports whether have is an acceptable stand-in for the preferred
+// language at or within floor.
+//
+// [TierNone] is not a usable floor and always reports false. It means "no
+// relationship", so accepting it as a floor would accept every language as a
+// substitute for every other. That matters because it is also what [ParseTier]
+// returns for input it does not recognise: a mistyped configuration value
+// therefore matches nothing rather than everything.
+func (p Preference) Match(have Tag, floor Tier) bool {
+	if floor >= TierNone {
+		return false
+	}
+	return p.Compare(have) <= floor
+}
+
+// Want returns the language this Preference was constructed with, so a caller
+// holding only the Preference (the build-once idiom) can still log or display
+// what was asked for.
+func (p Preference) Want() Tag { return p.want }
+
+// String renders the preference for a log line: the wanted tag's canonical
+// form, or "<none>" for the zero Preference. The bound table is deliberately
+// not rendered — two tables have no short faithful spelling.
+func (p Preference) String() string {
+	if p.want.IsZero() {
+		return "<none>"
+	}
+	return p.want.String()
+}
+
+// Best returns every candidate at the closest tier reached from the preferred
+// language, the tier itself, and whether anything was within floor.
+//
+// All returned candidates share one tier, because the caller is expected to
+// rank within a language by criteria this package knows nothing about: codec,
+// forced and hearing-impaired flags, track title, provider score. Input order
+// is preserved so an existing tie-break stays deterministic.
+//
+// tagOf extracts the language from a candidate, which lets a caller pass its
+// own type without building a parallel slice and mapping indices back. A
+// candidate whose tag is the zero Tag never matches.
+//
+// A floor of [TierNone] or beyond selects nothing, and does NOT widen to the
+// most permissive tier. An unrecognised configuration value parses to TierNone
+// (see [ParseTier]), and the safe reading of an unusable floor is that no
+// substitution was authorised, not that every substitution was.
+//
+// Best is a function rather than a method on [Preference] only because as of
+// Go 1.26 a method cannot declare the type parameter tagOf needs; the
+// preference sits where the receiver would. (Go 1.27's generic methods lift
+// that restriction; revisit at the next major, not before — the free function
+// stays correct either way.)
+func Best[T any](p Preference, candidates []T, tagOf func(T) Tag, floor Tier) (out []T, tier Tier, ok bool) {
+	if floor >= TierNone {
+		return nil, TierNone, false
+	}
+	best := TierNone
+	for _, cand := range candidates {
+		t := p.Compare(tagOf(cand))
+		if t > floor {
+			continue
+		}
+		switch {
+		case t < best:
+			best = t
+			out = append(out[:0], cand)
+		case t == best:
+			out = append(out, cand)
+		}
+	}
+	if best > floor {
+		return nil, TierNone, false
+	}
+	return out, best, true
+}
+
+// compare reports how far the available tag have sits from the wanted tag
+// want. The directional hazard the public surface exists to prevent lives
+// here, in one unexported place: every exported door routes through a
+// [Preference], which named the wanted Tag when it was constructed.
+func (c *Comparer) compare(want, have Tag) Tier {
 	// A tag that names no language cannot justify a substitution, and that
 	// includes two of them: "undetermined" equals "undetermined" as a string
 	// while telling us nothing about what either track contains.
@@ -186,89 +314,12 @@ func (c *Comparer) Compare(want, have Tag) Tier {
 	return TierNone
 }
 
-// Reason returns the recorded justification for a cross-language substitution,
-// and ok=false when the pair is not one. Intended for explaining
-// a surprising choice in a log line or a user-facing message.
-func (c *Comparer) Reason(want, have Tag) (string, bool) {
+// reason returns the recorded justification for the want -> have substitution,
+// and ok=false when the pair is not a cross-language entry.
+func (c *Comparer) reason(want, have Tag) (string, bool) {
 	if want.IsZero() || have.IsZero() {
 		return "", false
 	}
 	hit, ok := c.fallbacks[want.macroBase][have.macroBase]
 	return hit.reason, ok
-}
-
-// Reason returns the recorded justification for a cross-language substitution
-// under the built-in table. See [Comparer.Reason].
-func Reason(want, have Tag) (string, bool) { return defaultComparer.Reason(want, have) }
-
-// Match reports whether have is an acceptable stand-in for want at or within
-// floor, using the built-in table.
-//
-// [TierNone] is not a usable floor and always reports false, in either
-// position. It means "no relationship", so accepting it as a floor would accept
-// every language as a substitute for every other. That matters because it is
-// also what [ParseTier] returns for input it does not recognise: a mistyped
-// configuration value therefore matches nothing rather than everything.
-func Match(want, have Tag, floor Tier) bool {
-	if floor >= TierNone {
-		return false
-	}
-	return defaultComparer.Compare(want, have) <= floor
-}
-
-// Match reports whether have is an acceptable stand-in for want at or within
-// floor, under this Comparer's table. See the package-level [Match] for the
-// floor contract, which is identical: a floor of [TierNone] or beyond always
-// reports false.
-func (c *Comparer) Match(want, have Tag, floor Tier) bool {
-	if floor >= TierNone {
-		return false
-	}
-	return c.Compare(want, have) <= floor
-}
-
-// Best returns the candidates closest to want and the tier they matched at,
-// using the built-in table. See [BestWith].
-func Best[T any](want Tag, candidates []T, tagOf func(T) Tag, floor Tier) (out []T, tier Tier, ok bool) {
-	return BestWith(defaultComparer, want, candidates, tagOf, floor)
-}
-
-// BestWith returns every candidate at the closest tier reached, the tier
-// itself, and whether anything was within floor.
-//
-// All returned candidates share one tier, because the caller is expected to
-// rank within a language by criteria this package knows nothing about: codec,
-// forced and hearing-impaired flags, track title, provider score. Input order
-// is preserved so an existing tie-break stays deterministic.
-//
-// tagOf extracts the language from a candidate, which lets a caller pass its
-// own type without building a parallel slice and mapping indices back. A
-// candidate whose tag is the zero Tag never matches.
-//
-// A floor of [TierNone] or beyond selects nothing, and does NOT widen to the
-// most permissive tier. An unrecognised configuration value parses to TierNone
-// (see [ParseTier]), and the safe reading of an unusable floor is that no
-// substitution was authorised, not that every substitution was.
-func BestWith[T any](c *Comparer, want Tag, candidates []T, tagOf func(T) Tag, floor Tier) (out []T, tier Tier, ok bool) {
-	if floor >= TierNone {
-		return nil, TierNone, false
-	}
-	best := TierNone
-	for _, cand := range candidates {
-		t := c.Compare(want, tagOf(cand))
-		if t > floor {
-			continue
-		}
-		switch {
-		case t < best:
-			best = t
-			out = append(out[:0], cand)
-		case t == best:
-			out = append(out, cand)
-		}
-	}
-	if best > floor {
-		return nil, TierNone, false
-	}
-	return out, best, true
 }

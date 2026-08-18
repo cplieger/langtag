@@ -1,4 +1,4 @@
-module github.com/cplieger/langtag
+module github.com/cplieger/langtag/v2
 
 go 1.26.7
 

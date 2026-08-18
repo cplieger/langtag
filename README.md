@@ -1,6 +1,6 @@
 # langtag
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/cplieger/langtag.svg)](https://pkg.go.dev/github.com/cplieger/langtag)
+[![Go Reference](https://pkg.go.dev/badge/github.com/cplieger/langtag/v2.svg)](https://pkg.go.dev/github.com/cplieger/langtag/v2)
 [![Go version](https://img.shields.io/github/go-mod/go-version/cplieger/langtag)](https://github.com/cplieger/langtag/blob/main/go.mod)
 [![Test coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/langtag/badges/coverage.json)](https://github.com/cplieger/langtag/actions/workflows/coverage.yml)
 [![Mutation](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/langtag/badges/mutation.json)](https://github.com/cplieger/langtag/issues?q=label%3Agremlins-tracker)
@@ -19,7 +19,7 @@ only runtime dependency is [`golang.org/x/text`](https://pkg.go.dev/golang.org/x
 
 ## Install
 
-`go get github.com/cplieger/langtag@latest`
+`go get github.com/cplieger/langtag/v2@latest`
 
 ## Usage
 
@@ -29,7 +29,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/cplieger/langtag"
+	"github.com/cplieger/langtag/v2"
 )
 
 type subtitle struct {
@@ -49,7 +49,7 @@ func main() {
 		return
 	}
 
-	matches, tier, ok := langtag.Best(want, available,
+	matches, tier, ok := langtag.Best(langtag.Prefer(want), available,
 		func(s subtitle) langtag.Tag { return s.lang },
 		langtag.TierSameLanguage)
 	if !ok {
@@ -59,6 +59,24 @@ func main() {
 	fmt.Println(matches[0].file, "at tier", tier) // ep2.nor.srt at tier same-language
 }
 ```
+
+## Migrating from v1
+
+v2 moves the wanted language out of the argument lists and into a constructed
+`Preference`, so the direction of a comparison is fixed where the preference is
+built rather than re-stated, swappably, at every call site. Four renames:
+
+| v1 | v2 |
+| --- | --- |
+| `langtag.Compare(want, have)` | `langtag.Prefer(want).Compare(have)` |
+| `langtag.Reason(want, have)` | `langtag.Prefer(want).Reason(have)` |
+| `langtag.Match(want, have, floor)` | `langtag.Prefer(want).Match(have, floor)` |
+| `langtag.Best(want, candidates, tagOf, floor)` | `langtag.Best(langtag.Prefer(want), candidates, tagOf, floor)` |
+
+A custom table binds the same way: `c.Compare(want, have)` and friends become
+`c.Prefer(want).Compare(have)`, and `BestWith(c, want, ...)` becomes
+`langtag.Best(c.Prefer(want), ...)`. Grading is unchanged: every pair lands on
+the same tier it did in v1.
 
 ## Parsing
 
@@ -92,8 +110,8 @@ The zero `Tag` matches nothing, including another zero `Tag`. Two tracks both la
 
 ## Tiers
 
-`Compare(want, have)` reports how far the available language sits from the wanted one. A caller
-passes the highest tier it will accept as a floor.
+`Prefer(want)` binds the language a person chose, and `p.Compare(have)` reports how far the
+available language sits from it. A caller passes the highest tier it will accept as a floor.
 
 The order is by **kind of license**, from narrowest to widest, not by reading difficulty. Reading
 difficulty is not monotonic along it, and `TierOtherScript` is where that bites. CLDR scores a
@@ -144,15 +162,17 @@ symmetric property of the languages. `TierSharedLiteracy` says only that readers
 population, literate in the other, which is a one-way fact about people and licenses a
 substitution to a possibly unrelated language. Accepting the first does not accept the second.
 
-`Compare` is **not** commutative. Cross-language relationships are directed, so the argument order
-matters: `want` is the language a person chose, `have` is what the content offers. A Catalan
-viewer accepts a Spanish track; a Spanish viewer does not accept a Catalan one.
+Comparison is **not** commutative. Cross-language relationships are directed, and the direction is
+carried by the `Preference` role: `Prefer` names the language a person chose, so
+`p.Compare(have)` reads as the person's choice judging the offer, and no call site holds two tags
+whose order could be silently swapped. A Catalan viewer accepts a Spanish track; a Spanish viewer
+does not accept a Catalan one.
 
 ## The cross-language table
 
 Five shipped relationships, each a claim about people rather than about code, each one arguable.
-`Fallbacks` returns the table and `Reason` returns the justification for a given pair, so a
-surprised user can be shown why a substitution happened.
+`Fallbacks` returns the table and `Preference.Reason` returns the justification for a given pair,
+so a surprised user can be shown why a substitution happened.
 
 | Wanted | Accepted | Kind | Both ways | Why |
 | --- | --- | --- | --- | --- |
