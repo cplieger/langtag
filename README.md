@@ -64,7 +64,9 @@ func main() {
 
 v2 moves the wanted language out of the argument lists and into a constructed
 `Preference`, so the direction of a comparison is fixed where the preference is
-built rather than re-stated, swappably, at every call site. Four renames:
+built rather than re-stated, swappably, at every call site.
+
+Every import path gains the `/v2` suffix, because v2 is a new Go module path. Four renames follow:
 
 | v1 | v2 |
 | --- | --- |
@@ -83,6 +85,20 @@ gained in 1.27, so v2 requires that toolchain; it also means `Best` cannot
 appear in an interface, so a caller abstracting over selection wraps it in a
 non-generic method of its own.
 
+## API
+
+- **Parsing**: `Parse`, `MustParse` and `Valid` take a raw identifier. `Tag` reports `String`,
+  `Language`, `Script` and `IsZero`.
+- **Preferences**: `Prefer` binds the wanted language to the built-in table, and `Comparer.Prefer`
+  binds it to a custom one. `Preference` carries `Compare`, `Reason`, `Match`, `Best`, `Want` and
+  `String`.
+- **Tiers**: six `Tier` constants, with `Tier.String` and `ParseTier` for the configuration
+  spellings.
+- **Tables**: `Fallbacks` and `CloseScripts` return copies of the shipped judgments.
+  `WithFallbacks` replaces the cross-language table, `ValidateFallbacks` names the entries it
+  drops, and `Default` returns the built-in `Comparer`. `Fallback`, `CloseScript` and `Kind` are
+  the table types.
+
 ## Parsing
 
 `Parse` accepts ISO 639-1, ISO 639-2 in either the bibliographic or terminological variant,
@@ -92,7 +108,7 @@ ISO 639-3, and BCP 47 tags, in any ASCII letter case, with surrounding whitespac
 The accept set is ASCII alphanumerics only, because [RFC 5646 §2.1](https://www.rfc-editor.org/rfc/rfc5646#section-2.1)
 defines every subtag that way. Case folding is therefore ASCII byte arithmetic rather than a
 Unicode fold, which has two consequences worth relying on. `Parse`'s answers do not move when the
-toolchain's Unicode version does — verified across Unicode 15 and 17, over which the accept set and
+toolchain's Unicode version does; verified across Unicode 15 and 17, over which the accept set and
 every canonical form are byte-identical while `strings.EqualFold` changed its answer for three rune
 pairs. And a rune that a Unicode fold maps onto ASCII cannot impersonate a subtag: `İd` is not
 Indonesian and `ſk` is not Slovak, though a Unicode-aware comparison would call both equal to the
@@ -247,8 +263,9 @@ such pairs and assert every one stays at `TierNone` at every floor.
 
 Also absent, deliberately: collation, formatting, content negotiation, `Accept-Language` parsing,
 and any numeric distance between tiers (a number invites arithmetic across steps that are not
-commensurable). Display names live in the optional `langtag/name` subpackage, kept separate
-because its CLDR tables add roughly 2.5 MB to a binary.
+commensurable). Display names are not shipped: the CLDR tables behind
+[`x/text/language/display`](https://pkg.go.dev/golang.org/x/text/language/display) add roughly
+2.5 MB to a binary, so a caller that wants them imports that package directly.
 
 ### Written, not spoken
 
