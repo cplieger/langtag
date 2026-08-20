@@ -92,8 +92,11 @@ golangci-lint fmt
 `Parse` is the untrusted-input boundary: identifiers reach it from media
 metadata, transcoder output and third-party APIs. `FuzzParse` asserts more than
 absence of panics. A rejected tag must be the zero value and must match
-nothing; an accepted tag must name a language and must be a fixed point, so
-that its canonical form survives a round trip through storage.
+nothing; an accepted tag must name a language, must be a fixed point so that its
+canonical form survives a round trip through storage, and must be ASCII, because
+the canonical form is a persistence key and a non-ASCII byte in one would expose
+a consumer's own comparison to the Unicode fold tables this package never
+consults.
 
 ```sh
 go test -run '^$' -fuzz FuzzParse -fuzztime 60s
@@ -103,6 +106,13 @@ The committed corpus under `testdata/fuzz/` holds inputs that once failed and
 runs on every `go test`. `AA-u-0A-0A-u-00-00` is there because extension
 subtags made the canonical form non-idempotent, which is why `Parse` now
 composes the tag from exactly language, script and region.
+
+`FuzzParse` also seeds one input per class of Unicode 15-to-17 change — a newly
+folding pair, each category flip, a rune that folds or lowercases onto ASCII, a
+newly gained uppercase mapping, and a newly assigned letter. Coverage-guided
+fuzzing is unlikely to construct those runes on its own, and the weekly corpus
+does not persist between runs, so the committed seeds are the durable coverage.
+`unicode_test.go` asserts the same boundary exhaustively and explains each class.
 
 ### Mutation testing
 
