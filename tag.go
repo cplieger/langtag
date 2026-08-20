@@ -41,11 +41,23 @@ var nonLanguages = map[string]struct{}{
 // Parse canonicalizes one raw language identifier from an untrusted source.
 //
 // It accepts ISO 639-1, ISO 639-2 (bibliographic or terminological), ISO 639-3
-// and BCP 47 tags, in any letter case, with surrounding whitespace. ok is
+// and BCP 47 tags, in any ASCII letter case, with surrounding whitespace. ok is
 // false, and the returned Tag is the zero Tag, for the empty string, for the
 // placeholder subtags that name no language (und, zxx, mul, mis), for
 // private-use subtags (qaa through qtz), and for anything the IANA Language
 // Subtag Registry does not know.
+//
+// The accept set is ASCII alphanumerics only, and that is a property of the
+// grammar rather than a limitation: RFC 5646 §2.1 defines every subtag that way.
+// So case folding here is ASCII byte arithmetic, not a Unicode fold, and no
+// unicode.RangeTable, SimpleFold orbit or ToLower mapping is consulted on any
+// path. The consequence worth knowing is that Parse's answers do not move when
+// the toolchain's Unicode version does — verified across Unicode 15 and 17, over
+// which the accept set and every canonical form are byte-identical while
+// strings.EqualFold's answer changed for three rune pairs. It also means a rune
+// that a Unicode fold maps onto ASCII cannot impersonate a subtag: "İd" is not
+// Indonesian and "ſk" is not Slovak, though a Unicode-aware comparison would say
+// otherwise. See unicode_test.go, which asserts this exhaustively.
 //
 // Parse never reports an error value. Callers act on ok; there is no recovery
 // from a malformed tag beyond ignoring it, and every call site would otherwise

@@ -81,8 +81,17 @@ the same tier it did in v1.
 ## Parsing
 
 `Parse` accepts ISO 639-1, ISO 639-2 in either the bibliographic or terminological variant,
-ISO 639-3, and BCP 47 tags, in any letter case, with surrounding whitespace. It returns
+ISO 639-3, and BCP 47 tags, in any ASCII letter case, with surrounding whitespace. It returns
 `ok == false` rather than an error, because ignoring the tag is the only available recovery.
+
+The accept set is ASCII alphanumerics only, because [RFC 5646 §2.1](https://www.rfc-editor.org/rfc/rfc5646#section-2.1)
+defines every subtag that way. Case folding is therefore ASCII byte arithmetic rather than a
+Unicode fold, which has two consequences worth relying on. `Parse`'s answers do not move when the
+toolchain's Unicode version does — verified across Unicode 15 and 17, over which the accept set and
+every canonical form are byte-identical while `strings.EqualFold` changed its answer for three rune
+pairs. And a rune that a Unicode fold maps onto ASCII cannot impersonate a subtag: `İd` is not
+Indonesian and `ſk` is not Slovak, though a Unicode-aware comparison would call both equal to the
+real thing.
 
 Canonicalization collapses the code systems that spell one language several ways:
 

@@ -184,12 +184,34 @@ func TestMustParsePanicsOnBadInput(t *testing.T) {
 // FuzzParse guards the untrusted-input boundary. Language identifiers reach
 // this package from Plex metadata, ffprobe output and third-party APIs, so
 // every invariant a caller relies on is asserted here rather than assumed.
+//
+// The non-ASCII seeds are one per class of Unicode 15 -> 17 change, because the
+// committed corpus is the durable fuzz coverage and coverage-guided exploration
+// is unlikely to construct these runes on its own. Each class and the rune
+// standing for it is documented in unicode_test.go; the charset boundary they
+// probe is asserted exhaustively there, and seeded here so the round-trip and
+// tier invariants below also run against them.
 func FuzzParse(f *testing.F) {
 	for _, seed := range []string{
 		"", " ", "en", "ENG", "nob", "nor", "und", "zxx", "mul", "mis", "qaa",
 		"pt-BR", "zh-Hant-HK", "es-419", "sr-Latn-RS", "x-private",
 		"i-klingon", "art-lojban", "en-US-u-va-posix", "\x00", "\xff\xfe",
 		"------", strings.Repeat("en-", 40), "en-" + strings.Repeat("a", 100),
+
+		// Newly folding in Unicode 17, both members pre-existing: the only class
+		// that changes strings.EqualFold for input a corpus can already hold.
+		"\u0390n", "\u1FD3n", "\u03B0n", "\u1FE3n", "\uFB05k", "\uFB06k",
+		// Category flips. U+0295 left Ll for Lo while already assigned, so
+		// unicode.IsLower flips true -> false for real text; U+1171E left Mn
+		// for Mc, the one change running the other way.
+		"e\u0295", "en-\u1171Eatn",
+		// Non-ASCII runes that a Unicode fold or lowercase maps onto ASCII, so
+		// they impersonate a real subtag. Complete set for ASCII targets.
+		"\u017Fk", "i\u017F", "\u212Ak", "\u0130d",
+		// Gained a ToUpper mapping in Unicode 17 while already assigned.
+		"e\u019B",
+		// Newly assigned letter: unicode.IsLetter false on 15, true on 17.
+		"\u105C0n",
 	} {
 		f.Add(seed)
 	}
@@ -224,6 +246,19 @@ func FuzzParse(f *testing.F) {
 		// A tag always matches itself exactly, at every floor.
 		if tier := langtag.Prefer(got).Compare(got); tier != langtag.TierIdentical {
 			t.Fatalf("Prefer(x).Compare(x) for Parse(%q) = %v, want %v", raw, tier, langtag.TierIdentical)
+		}
+		// Every accepted tag is ASCII, whatever arrived. BCP 47 subtags are
+		// ASCII alphanumerics by grammar (RFC 5646 §2.1), and the canonical form
+		// is a persistence key, so a non-ASCII byte reaching it would expose a
+		// consumer's own comparison to the Unicode fold tables this package
+		// deliberately never consults. Asserted here as a property so it holds
+		// for generated input, not only for the seeds above.
+		for _, out := range []string{got.String(), got.Language(), got.Script()} {
+			for i := range len(out) {
+				if out[i] >= 0x80 {
+					t.Fatalf("Parse(%+q) produced %+q, which carries a non-ASCII byte at %d", raw, out, i)
+				}
+			}
 		}
 	})
 }

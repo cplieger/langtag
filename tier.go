@@ -122,6 +122,14 @@ func ParseTier(s string) (Tier, bool) {
 
 // normalizeTierName lowercases and folds underscores to hyphens so the
 // configuration surface tolerates both spellings.
+//
+// The fold is ASCII byte arithmetic rather than strings.ToLower, matching the
+// tag parser's own ASCII-only gate. The tier names are ASCII by construction, so
+// a Unicode fold could only ever widen what is accepted — and it would widen it
+// onto exactly the impersonation shape the tag side refuses, since
+// strings.ToLower maps U+0130 onto "i" and strings.EqualFold matches U+017F
+// against "s". A Unicode spelling therefore fails closed here, which is the safe
+// direction: ParseTier's failure value is TierNone, a floor that matches nothing.
 func normalizeTierName(s string) string {
 	out := make([]byte, 0, len(s))
 	for i := range len(s) {
