@@ -1,5 +1,7 @@
 package langtag
 
+import "slices"
+
 // Kind separates the two different claims a cross-language fallback can make.
 // It decides which tier an entry lands on, so that a caller can accept one kind
 // of substitution without accepting the other.
@@ -156,7 +158,5 @@ var builtinFallbacks = []Fallback{
 // shipped judgments, and amend a copy, without being able to mutate the
 // package's own.
 func Fallbacks() []Fallback {
-	out := make([]Fallback, len(builtinFallbacks))
-	copy(out, builtinFallbacks)
-	return out
+	return slices.Clone(builtinFallbacks)
 }
