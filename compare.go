@@ -107,7 +107,8 @@ func conflictingPairs(f []Fallback) []error {
 		if prev, exists := seen[key]; exists && prev.tier != tier {
 			errs = append(errs, fmt.Errorf(
 				"fallbacks %d and %d both claim %q -> %q, at %v and %v; the farther tier wins",
-				prev.index, index, want, have, prev.tier, tier))
+				prev.index, index, want, have, prev.tier, tier,
+			))
 			return
 		}
 		seen[key] = claim{tier: tier, index: index}

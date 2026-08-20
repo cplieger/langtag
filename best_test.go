@@ -93,7 +93,8 @@ func TestBest(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got, tier, ok := langtag.Best(
-				langtag.Prefer(langtag.MustParse(tc.want)), tracks(t, tc.available...), trackLang, tc.floor)
+				langtag.Prefer(langtag.MustParse(tc.want)), tracks(t, tc.available...), trackLang, tc.floor,
+			)
 			if ok != tc.ok {
 				t.Fatalf("Best(Prefer(%q), %v, %v) ok = %v, want %v", tc.want, tc.available, tc.floor, ok, tc.ok)
 			}
@@ -135,7 +136,8 @@ func TestBestSkipsUnparsedCandidates(t *testing.T) {
 func TestBestCapsFloorAtSensitive(t *testing.T) {
 	t.Parallel()
 	got, tier, ok := langtag.Best(
-		langtag.Prefer(langtag.MustParse("nob")), tracks(t, "swe", "eng"), trackLang, langtag.TierNone)
+		langtag.Prefer(langtag.MustParse("nob")), tracks(t, "swe", "eng"), trackLang, langtag.TierNone,
+	)
 	if ok {
 		t.Errorf("Best(Prefer(nob), [swe eng], none) = (%v, %v, true), want ok=false", names(got), tier)
 	}
