@@ -107,7 +107,7 @@ runs on every `go test`. `AA-u-0A-0A-u-00-00` is there because extension
 subtags made the canonical form non-idempotent, which is why `Parse` now
 composes the tag from exactly language, script and region.
 
-`FuzzParse` also seeds one input per class of Unicode 15-to-17 change — a newly
+`FuzzParse` also seeds one input per class of Unicode 15-to-17 change: a newly
 folding pair, each category flip, a rune that folds or lowercases onto ASCII, a
 newly gained uppercase mapping, and a newly assigned letter. Coverage-guided
 fuzzing is unlikely to construct those runes on its own, and the weekly corpus
@@ -135,6 +135,11 @@ Tests are black-box (`package langtag_test`) and exercise the public API only.
   makes the tiers a scale rather than a set of labels.
 - `best_test.go`: candidate selection, table overrides, and the configuration
   surface.
+- `kind_test.go`: the Kind-versus-direction rule, table validation, and the
+  fail-closed contracts (an unusable floor, a zero `Preference`, a nil table).
+- `scripts_test.go`: close-script membership and the provenance of each entry.
+- `unicode_test.go`: the ASCII accept set, asserted rune by rune against the
+  Unicode 15 and 17 fold tables.
 - `example_test.go`: runnable examples, which are verified documentation.
 
 Table-driven cases live in maps so iteration order is randomized, and every
