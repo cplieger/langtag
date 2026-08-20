@@ -255,12 +255,14 @@ func (p Preference) String() string {
 // (see [ParseTier]), and the safe reading of an unusable floor is that no
 // substitution was authorised, not that every substitution was.
 //
-// Best is a function rather than a method on [Preference] only because as of
-// Go 1.26 a method cannot declare the type parameter tagOf needs; the
-// preference sits where the receiver would. (Go 1.27's generic methods lift
-// that restriction; revisit at the next major, not before — the free function
-// stays correct either way.)
-func Best[T any](p Preference, candidates []T, tagOf func(T) Tag, floor Tier) (out []T, tier Tier, ok bool) {
+// Best is a generic METHOD on Preference (Go 1.27), which is what lets it sit
+// beside Compare, Reason and Match instead of standing apart from them: the
+// type parameter is the caller's own candidate type, and before 1.27 a method
+// could not declare one, so this had to be a package-level function taking the
+// preference as its first argument. The consequence to know: a generic method
+// can never satisfy an interface, so a caller that abstracts over selection
+// strategies wraps this in a non-generic method of its own.
+func (p Preference) Best[T any](candidates []T, tagOf func(T) Tag, floor Tier) (out []T, tier Tier, ok bool) {
 	if floor >= TierNone {
 		return nil, TierNone, false
 	}

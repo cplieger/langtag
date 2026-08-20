@@ -49,7 +49,7 @@ func main() {
 		return
 	}
 
-	matches, tier, ok := langtag.Best(langtag.Prefer(want), available,
+	matches, tier, ok := langtag.Prefer(want).Best(available,
 		func(s subtitle) langtag.Tag { return s.lang },
 		langtag.TierSameLanguage)
 	if !ok {
@@ -71,12 +71,17 @@ built rather than re-stated, swappably, at every call site. Four renames:
 | `langtag.Compare(want, have)` | `langtag.Prefer(want).Compare(have)` |
 | `langtag.Reason(want, have)` | `langtag.Prefer(want).Reason(have)` |
 | `langtag.Match(want, have, floor)` | `langtag.Prefer(want).Match(have, floor)` |
-| `langtag.Best(want, candidates, tagOf, floor)` | `langtag.Best(langtag.Prefer(want), candidates, tagOf, floor)` |
+| `langtag.Best(want, candidates, tagOf, floor)` | `langtag.Prefer(want).Best(candidates, tagOf, floor)` |
 
 A custom table binds the same way: `c.Compare(want, have)` and friends become
 `c.Prefer(want).Compare(have)`, and `BestWith(c, want, ...)` becomes
-`langtag.Best(c.Prefer(want), ...)`. Grading is unchanged: every pair lands on
-the same tier it did in v1.
+`c.Prefer(want).Best(...)`. Grading is unchanged: every pair lands on the same
+tier it did in v1.
+
+All four are methods on `Preference`. `Best` is a generic method, which Go
+gained in 1.27, so v2 requires that toolchain; it also means `Best` cannot
+appear in an interface, so a caller abstracting over selection wraps it in a
+non-generic method of its own.
 
 ## Parsing
 

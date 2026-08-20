@@ -134,9 +134,10 @@ func TestUnusableFloorSelectsNothing(t *testing.T) {
 		if langtag.Prefer(zero).Match(zero, floor) {
 			t.Errorf("Prefer(zero).Match(zero, %v) = true, want false", floor)
 		}
-		got, tier, ok := langtag.Best(langtag.Prefer(langtag.MustParse("ca")),
+		got, tier, ok := langtag.Prefer(langtag.MustParse("ca")).Best(
 			[]langtag.Tag{langtag.MustParse("es")},
-			func(t langtag.Tag) langtag.Tag { return t }, floor)
+			func(t langtag.Tag) langtag.Tag { return t }, floor,
+		)
 		if ok {
 			t.Errorf("Best(Prefer(ca), [es], %v) = (%v, %v, true), want ok=false; an unusable floor must not widen to the most permissive tier",
 				floor, got, tier)
@@ -176,7 +177,7 @@ func TestZeroPreferenceFailsClosed(t *testing.T) {
 	if p.Match(en, langtag.TierSharedLiteracy) {
 		t.Error("zero Preference: Match(en, shared-literacy) = true, want false")
 	}
-	got, tier, ok := langtag.Best(p, []langtag.Tag{en},
+	got, tier, ok := p.Best([]langtag.Tag{en},
 		func(t langtag.Tag) langtag.Tag { return t }, langtag.TierSharedLiteracy)
 	if ok {
 		t.Errorf("Best(zero Preference, [en], shared-literacy) = (%v, %v, true), want ok=false", got, tier)
