@@ -243,7 +243,7 @@ distance, is `languageInfo.xml` itself, never the library's matcher. This packag
 only for parsing and canonicalization, which come from the IANA Language Subtag Registry and are
 not affected.
 
-## What this package will not do
+## Unsupported by Design
 
 **It will not substitute an unrelated language at the intelligible tier or below.** CLDR's
 distance data rates Basque against Spanish, Welsh against English, Tamil against English and
