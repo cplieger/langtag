@@ -92,8 +92,8 @@ func TestBest(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			got, tier, ok := langtag.Best(
-				langtag.Prefer(langtag.MustParse(tc.want)), tracks(t, tc.available...), trackLang, tc.floor,
+			got, tier, ok := langtag.Prefer(langtag.MustParse(tc.want)).Best(
+				tracks(t, tc.available...), trackLang, tc.floor,
 			)
 			if ok != tc.ok {
 				t.Fatalf("Best(Prefer(%q), %v, %v) ok = %v, want %v", tc.want, tc.available, tc.floor, ok, tc.ok)
@@ -118,7 +118,7 @@ func TestBestSkipsUnparsedCandidates(t *testing.T) {
 		{name: "untagged", lang: langtag.Tag{}},
 		{name: "nor", lang: langtag.MustParse("nor")},
 	}
-	got, tier, ok := langtag.Best(langtag.Prefer(langtag.MustParse("nob")), candidates, trackLang, langtag.TierSameLanguage)
+	got, tier, ok := langtag.Prefer(langtag.MustParse("nob")).Best(candidates, trackLang, langtag.TierSameLanguage)
 	if !ok {
 		t.Fatal("Best(Prefer(nob), [untagged nor], same-language) ok = false, want true")
 	}
@@ -135,8 +135,8 @@ func TestBestSkipsUnparsedCandidates(t *testing.T) {
 // which is never what a caller means by "be permissive".
 func TestBestCapsFloorAtSensitive(t *testing.T) {
 	t.Parallel()
-	got, tier, ok := langtag.Best(
-		langtag.Prefer(langtag.MustParse("nob")), tracks(t, "swe", "eng"), trackLang, langtag.TierNone,
+	got, tier, ok := langtag.Prefer(langtag.MustParse("nob")).Best(
+		tracks(t, "swe", "eng"), trackLang, langtag.TierNone,
 	)
 	if ok {
 		t.Errorf("Best(Prefer(nob), [swe eng], none) = (%v, %v, true), want ok=false", names(got), tier)

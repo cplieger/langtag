@@ -49,7 +49,7 @@ func ExamplePreference_Compare_directed() {
 
 // Best selects from a caller's own type and returns every candidate at the
 // closest tier, leaving the final choice to whatever the caller ranks by.
-func ExampleBest() {
+func ExamplePreference_Best() {
 	type subtitle struct {
 		file  string
 		codec string
@@ -63,7 +63,7 @@ func ExampleBest() {
 	}
 	want := langtag.Prefer(langtag.MustParse("nob")) // the viewer chose Bokmål on episode 1
 
-	matches, tier, ok := langtag.Best(want, available,
+	matches, tier, ok := want.Best(available,
 		func(s subtitle) langtag.Tag { return s.lang },
 		langtag.TierSameLanguage)
 	if !ok {
