@@ -1,5 +1,7 @@
 package langtag
 
+import "slices"
+
 // CloseScript is a pair of scripts that one language's readers move between
 // freely, so a difference between them is not a barrier the way a script
 // difference usually is.
@@ -60,9 +62,7 @@ var closeScripts = []CloseScript{
 // disagree with. A caller that wants a script difference treated as a barrier
 // anyway floors at [TierSameLanguage] and gets that.
 func CloseScripts() []CloseScript {
-	out := make([]CloseScript, len(closeScripts))
-	copy(out, closeScripts)
-	return out
+	return slices.Clone(closeScripts)
 }
 
 // scriptsReadAsOne reports whether a difference between two scripts of one
