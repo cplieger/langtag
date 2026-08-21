@@ -161,6 +161,63 @@ func TestCompareIsDirected(t *testing.T) {
 	}
 }
 
+// TestDefaultIsTheBuiltInTable pins the relationship between the package's two
+// doors onto the built-in judgments: Prefer binds the table implicitly, Default
+// hands it over so a caller can hold it. A Default that returned nothing would
+// not fail loudly — a Preference on a nil table grades every pair TierNone — so
+// the equivalence is asserted rather than assumed.
+func TestDefaultIsTheBuiltInTable(t *testing.T) {
+	t.Parallel()
+	ca, es := langtag.MustParse("ca"), langtag.MustParse("es")
+	if got := langtag.Default().Prefer(ca).Compare(es); got != langtag.TierSharedLiteracy {
+		t.Errorf("Default().Prefer(ca).Compare(es) = %v, want %v", got, langtag.TierSharedLiteracy)
+	}
+	nob, nn := langtag.MustParse("nob"), langtag.MustParse("nn")
+	if got := langtag.Default().Prefer(nob).Compare(nn); got != langtag.TierIntelligible {
+		t.Errorf("Default().Prefer(nob).Compare(nn) = %v, want %v", got, langtag.TierIntelligible)
+	}
+	if got, ok := langtag.Default().Prefer(ca).Reason(es); !ok || got == "" {
+		t.Errorf("Default().Prefer(ca).Reason(es) = (%q, %v), want a justification and true", got, ok)
+	}
+}
+
+// TestPreferenceReportsTheWantedLanguage covers what a Preference says about
+// itself, which is all a caller holding only the Preference (the build-once
+// idiom) has to log. Both answers come back in canonical form, because the Tag
+// was canonicalized at construction rather than by either accessor.
+func TestPreferenceReportsTheWantedLanguage(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		in, canon string
+	}{
+		"case is normalized":   {"PT-br", "pt-BR"},
+		"variant is discarded": {"de-1996", "de"},
+		"script is kept":       {"sr-Latn", "sr-Latn"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			p := langtag.Prefer(langtag.MustParse(tc.in))
+			if got := p.Want().String(); got != tc.canon {
+				t.Errorf("Prefer(MustParse(%q)).Want().String() = %q, want %q", tc.in, got, tc.canon)
+			}
+			if got := p.String(); got != tc.canon {
+				t.Errorf("Prefer(MustParse(%q)).String() = %q, want %q", tc.in, got, tc.canon)
+			}
+		})
+	}
+	t.Run("zero preference names no language", func(t *testing.T) {
+		t.Parallel()
+		var p langtag.Preference
+		if got := p.String(); got != "<none>" {
+			t.Errorf("langtag.Preference{}.String() = %q, want %q", got, "<none>")
+		}
+		if !p.Want().IsZero() {
+			t.Errorf("langtag.Preference{}.Want() = %q, want the zero Tag", p.Want())
+		}
+	})
+}
+
 func TestMatch(t *testing.T) {
 	t.Parallel()
 	nob, nor := langtag.MustParse("nob"), langtag.MustParse("nor")
