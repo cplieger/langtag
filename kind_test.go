@@ -236,6 +236,23 @@ func TestKindTier(t *testing.T) {
 	if got := langtag.SharedLiteracy.String(); got != "shared-literacy" {
 		t.Errorf("SharedLiteracy.String() = %q, want %q", got, "shared-literacy")
 	}
+	// An unset or unknown Kind lands on the tier that licenses nothing. This is
+	// the whole reason Kind has no usable zero value: a malformed entry that
+	// reached the tier scale at all would inherit the stronger of the two
+	// curated claims, which is the error the Kind/direction split exists to
+	// prevent.
+	if got := langtag.KindUnset.Tier(); got != langtag.TierNone {
+		t.Errorf("KindUnset.Tier() = %v, want %v", got, langtag.TierNone)
+	}
+	if got := langtag.Kind(99).Tier(); got != langtag.TierNone {
+		t.Errorf("Kind(99).Tier() = %v, want %v", got, langtag.TierNone)
+	}
+	if got := langtag.KindUnset.String(); got != "unset" {
+		t.Errorf("KindUnset.String() = %q, want %q", got, "unset")
+	}
+	if got := langtag.Kind(99).String(); got != "unset" {
+		t.Errorf("Kind(99).String() = %q, want %q", got, "unset")
+	}
 }
 
 // TestExcludedFamilyStaysOutAtEveryFloor extends the shared-literacy exclusion

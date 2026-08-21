@@ -327,7 +327,14 @@ func TestTierStringRoundTrips(t *testing.T) {
 			t.Errorf("ParseTier(%q) = %v, want %v", s, got, tier)
 		}
 	}
-	if got := langtag.Tier(99).String(); got != "invalid" {
-		t.Errorf("Tier(99).String() = %q, want %q", got, "invalid")
+	// A tier past the last named one renders as "invalid" rather than indexing
+	// off the end of the name table. TierNone+1 is the value that matters: it is
+	// the first tier with no name, so it is the only input that distinguishes a
+	// guard covering the whole table from one that leaves its last slot open.
+	// Printed as a number, because %v on a Tier is the method under test.
+	for _, tier := range []langtag.Tier{langtag.TierNone + 1, langtag.Tier(99)} {
+		if got := tier.String(); got != "invalid" {
+			t.Errorf("Tier(%d).String() = %q, want %q", uint8(tier), got, "invalid")
+		}
 	}
 }
