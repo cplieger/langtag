@@ -24,25 +24,19 @@ type CloseScript struct {
 // closeScripts promotes a same-language script difference from
 // [TierOtherScript] to [TierSameLanguage].
 //
-// Unlike the cross-language table, this list is derived rather than judged, and
-// the derivation is narrow enough to state in full. CLDR's languageInfo.xml
-// gives a generic same-language cross-script distance of 50, and names only a
-// handful of specific script pairs. Of those, all but one are ONE-WAY
-// transliteration rows: ja-Latn onto ja-Jpan, ko-Hani onto ko-Kore, hi-Latn onto
-// hi-Deva and the other Latin romanizations of Indic and Arabic scripts. A
-// romanization feeding its native script is not two audiences reading each
-// other, which is the same reason a one-way language relation is shared literacy
-// rather than interchangeability.
+// Unlike the cross-language table, this list is derived, not judged: CLDR's
+// languageInfo.xml gives a generic same-language cross-script distance of
+// 50 and names only a few specific pairs, of which all but one are one-way
+// transliteration rows (romanization feeding its native script, not two
+// audiences reading each other — the same reason a one-way language
+// relation is shared literacy). The one symmetric pair, Serbian, earns the
+// promotion twice: CLDR rates it 5, and Serbian schooling teaches both
+// scripts.
 //
-// That leaves exactly one symmetric pair, and it earns the promotion twice over:
-// CLDR rates it 5 against the generic 50, and Serbian schooling teaches both
-// scripts, so a reader handles either.
-//
-// Deliberately absent: Simplified against Traditional Chinese, which CLDR does
-// not name at all and which therefore sits at the generic 50, above every
-// curated close-language pair. And uz-Latn against uz-Cyrl and az-Latn against
-// az-Cyrl, which x/text's embedded snapshot rates as close but upstream CLDR
-// does not name either.
+// Deliberately absent: Simplified/Traditional Chinese (CLDR names no
+// distance, so it sits at the generic 50), and uz-Latn/uz-Cyrl,
+// az-Latn/az-Cyrl (x/text's stale snapshot rates them close but upstream
+// CLDR does not name either).
 var closeScripts = []CloseScript{
 	{
 		Language: "sr", A: "Latn", B: "Cyrl",

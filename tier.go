@@ -3,22 +3,18 @@ package langtag
 // Tier is how far an available language sits from the one that was wanted. A
 // caller picks the highest tier it will accept as a floor.
 //
-// The order is by KIND OF LICENSE, from narrowest to widest: the same tag, then
-// the same language, then the same language in another script, then a close
-// language, then a language readers merely happen to be schooled in. It is
-// deliberately NOT a reading-difficulty scale, and reading difficulty is not
-// monotonic along it. [TierOtherScript] is where that shows: what remains on it
-// is the script pairs CLDR does not explicitly rate, which it scores at 50,
-// farther than any pair on the two tiers above. A caller serving Chinese content
-// should weigh that before accepting TierOtherScript.
+// The order is by KIND OF LICENSE, narrowest to widest — not a reading-
+// difficulty scale, and reading difficulty is not monotonic along it:
+// [TierOtherScript] covers the script pairs CLDR does not explicitly rate,
+// which it scores at 50, farther than any pair on the two tiers above.
 //
-// Tiers 0 through 2 follow from published standards data and hold no opinion.
-// The two tiers above them are curated judgments, and they are separated
-// because they make different kinds of claim: [TierIntelligible] says two
-// languages are interchangeable, while [TierSharedLiteracy] says only that
-// readers of one are, as a population, literate in the other. The second is a
-// much weaker claim and the substitution it licenses is a different language
-// entirely, so reaching it takes its own opt-in.
+// Tiers 0 through 2 follow from published standards data and hold no
+// opinion. The two tiers above are curated judgments, separated because they
+// make different claims: [TierIntelligible] says two languages are
+// interchangeable, [TierSharedLiteracy] says only that readers of one are,
+// as a population, literate in the other — a much weaker claim licensing
+// substitution to a different language entirely, so reaching it needs its
+// own opt-in.
 type Tier uint8
 
 const (

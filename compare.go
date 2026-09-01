@@ -33,16 +33,15 @@ func Default() *Comparer { return defaultComparer }
 
 // WithFallbacks returns a Comparer using the supplied cross-language table
 // instead of the built-in one. Passing nil or an empty slice disables both
-// cross-language tiers, so no substitution beyond [TierOtherScript] can occur
-// at any floor.
+// cross-language tiers.
 //
-// Entries name languages as [Tag.Language] reports them, so "no" rather than
-// "nb" or "nor". An entry naming anything else simply never matches.
+// Entries name languages as [Tag.Language] reports them ("no" rather than
+// "nb" or "nor"); an entry naming anything else never matches.
 //
-// Malformed entries are DROPPED rather than accommodated, so a table authoring
+// Malformed entries are dropped rather than accommodated, so an authoring
 // mistake removes a substitution instead of licensing an unintended one. See
-// [ValidateFallbacks] to find out which entries were rejected and why. An entry
-// is malformed when it names no language on either side, names one language on
+// [ValidateFallbacks] for which entries were rejected and why. An entry is
+// malformed when it names no language on either side, names one language on
 // both, carries no Kind, or claims a Kind that disagrees with its direction.
 func WithFallbacks(f []Fallback) *Comparer {
 	c := &Comparer{fallbacks: make(map[string]map[string]fallbackHit, len(f))}
@@ -150,28 +149,20 @@ func fallbackError(e Fallback) string {
 	}
 }
 
-// Preference is the language a person chose, bound to the fallback table that
-// will judge substitutes for it. Construct one with [Prefer] for the built-in
-// table or [Comparer.Prefer] for a custom one, then ask it about whatever the
-// content offers.
+// Preference is the language a person chose, bound to the fallback table
+// that judges substitutes for it. Construct one with [Prefer] for the
+// built-in table or [Comparer.Prefer] for a custom one.
 //
-// The construction carries the direction. Cross-language entries are directed
-// — a Catalan viewer accepts a Spanish track, and a Spanish viewer does not
-// accept a Catalan one — and two Tags side by side in an argument list can be
-// transposed without anything noticing. A Preference names the wanted side
-// once, at construction, so a comparison site has only one Tag to pass:
-// p.Compare(have) reads as the person's choice judging the offer. Two
-// preferences compared on adjacent lines can still be written in either
-// order — what the role buys is that a transposition is named and visible at
-// the site, not that it is impossible.
+// Cross-language entries are directed — a Catalan viewer accepts a Spanish
+// track, a Spanish viewer does not accept a Catalan one — and Preference
+// carries that direction so a comparison site holds only one Tag:
+// p.Compare(have) reads as the person's choice judging the offer.
 //
-// The zero Preference is usable and fails closed. It prefers the zero Tag,
-// which names no language, so Compare answers [TierNone] for every input,
-// Reason answers ok=false, and Match and Best select nothing. The same
-// direction holds for a Preference built from a nil *Comparer: it judges
-// NOTHING acceptable, rather than silently inheriting the built-in table —
-// a nil table is a caller bug, and the widest table this package ships is
-// the one answer a bug must not receive.
+// The zero Preference fails closed: it prefers the zero Tag, so Compare
+// answers [TierNone] for every input, Reason answers ok=false, and Match and
+// Best select nothing. A Preference built from a nil *Comparer fails closed
+// the same way — it judges nothing acceptable rather than silently
+// inheriting the built-in table.
 type Preference struct {
 	c    *Comparer
 	want Tag
@@ -238,30 +229,26 @@ func (p Preference) String() string {
 	return p.want.String()
 }
 
-// Best returns every candidate at the closest tier reached from the preferred
-// language, the tier itself, and whether anything was within floor.
+// Best returns every candidate at the closest tier reached from the
+// preferred language, the tier itself, and whether anything was within
+// floor.
 //
-// All returned candidates share one tier, because the caller is expected to
-// rank within a language by criteria this package knows nothing about: codec,
-// forced and hearing-impaired flags, track title, provider score. Input order
-// is preserved so an existing tie-break stays deterministic.
+// All returned candidates share one tier: ranking within a language (codec,
+// forced/hearing-impaired flags, provider score) is the caller's job. Input
+// order is preserved so an existing tie-break stays deterministic.
 //
-// tagOf extracts the language from a candidate, which lets a caller pass its
-// own type without building a parallel slice and mapping indices back. A
-// candidate whose tag is the zero Tag never matches.
+// tagOf extracts the language from a candidate, letting a caller pass its
+// own type without building a parallel slice. A candidate whose tag is the
+// zero Tag never matches.
 //
-// A floor of [TierNone] or beyond selects nothing, and does NOT widen to the
-// most permissive tier. An unrecognised configuration value parses to TierNone
-// (see [ParseTier]), and the safe reading of an unusable floor is that no
-// substitution was authorised, not that every substitution was.
+// A floor of [TierNone] or beyond selects nothing rather than widening to
+// the most permissive tier — the safe reading of an unusable floor (e.g. one
+// [ParseTier] failed to parse) is that no substitution was authorised.
 //
-// Best is a generic METHOD on Preference (Go 1.27), which is what lets it sit
-// beside Compare, Reason and Match instead of standing apart from them: the
-// type parameter is the caller's own candidate type, and before 1.27 a method
-// could not declare one, so this had to be a package-level function taking the
-// preference as its first argument. The consequence to know: a generic method
-// can never satisfy an interface, so a caller that abstracts over selection
-// strategies wraps this in a non-generic method of its own.
+// Best is a generic METHOD on Preference (Go 1.27); before 1.27 this had to
+// be a package-level function taking the preference as its first argument.
+// A generic method can never satisfy an interface, so a caller abstracting
+// over selection strategies wraps this in a non-generic method of its own.
 func (p Preference) Best[T any](candidates []T, tagOf func(T) Tag, floor Tier) (out []T, tier Tier, ok bool) {
 	if floor >= TierNone {
 		return nil, TierNone, false

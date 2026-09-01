@@ -6,14 +6,11 @@ import (
 	"github.com/cplieger/langtag/v2"
 )
 
-// TestCloseScriptsPromoteOnlyWhatCLDRVouchesFor pins the one item moved between
-// tiers, and the reasoning that decides membership.
-//
-// A script difference is normally farther than a region difference, and CLDR
-// agrees: it scores a generic same-language cross-script substitution at 50. It
-// names only a handful of specific script pairs, and all but one of those are
-// ONE-WAY transliteration rows, which is not two audiences reading each other.
-// The single symmetric pair is Serbian, so that is the whole population.
+// TestCloseScriptsPromoteOnlyWhatCLDRVouchesFor pins the one item moved
+// between tiers: CLDR scores a generic same-language cross-script
+// substitution at 50 and names only a handful of specific pairs, all but one
+// a one-way transliteration row. The one symmetric pair is Serbian, so that
+// is the whole population.
 func TestCloseScriptsPromoteOnlyWhatCLDRVouchesFor(t *testing.T) {
 	t.Parallel()
 	t.Run("serbian latin and cyrillic", func(t *testing.T) {

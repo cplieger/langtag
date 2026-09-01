@@ -8,42 +8,29 @@ import (
 	"github.com/cplieger/langtag/v2"
 )
 
-// This file pins the charset boundary, which is the property that decides
-// whether a toolchain's Unicode tables can move this package's answers.
+// This file pins the charset boundary: RFC 5646 §2.1 defines every BCP 47
+// subtag as ASCII alphanumerics, and golang.org/x/text enforces that with a
+// byte-level gate applied before any case folding, so no
+// unicode.RangeTable, SimpleFold orbit, or ToLower mapping is consulted on
+// any path a caller can reach. Tier names take the same ASCII-only route
+// through normaliseTierName.
 //
-// They cannot, and the reason is structural rather than lucky. RFC 5646 §2.1
-// defines every BCP 47 subtag as ASCII alphanumerics, so the grammar itself
-// admits nothing else. golang.org/x/text enforces that with a byte-level gate
-// (internal/language.isAlphaNum) applied to each hyphen-delimited token as it is
-// scanned, BEFORE any case folding, and its folding is byte-level ASCII
-// arithmetic (internal/language.(*scanner).toLower) rather than a Unicode fold.
-// Tier names take the same route through this package's own ASCII-only
-// normaliseTierName. So no unicode.RangeTable, no SimpleFold orbit and no
-// ToLower mapping is consulted on any path a caller can reach.
+// That matters because the alternative is a live hazard elsewhere: a
+// [strings.EqualFold] used as an identity check accepts a non-ASCII rune
+// that folds onto an ASCII one, which is how "localhoſt" once classified as
+// loopback in a sibling library. Subtag matching is exactly an identity
+// check, so these tests assert the refusal at each impersonation.
 //
-// That matters because the alternative shape is a live hazard elsewhere: a
-// [strings.EqualFold] used as an IDENTITY check accepts a non-ASCII rune that
-// folds onto an ASCII one, which is how "localhoſt" once classified as loopback
-// in a sibling library. Subtag matching is exactly an identity check, so these
-// tests assert the refusal at each impersonation rather than trusting the
-// grammar.
-//
-// Measured across a real go1.26.7 and a real go1.27.0 toolchain (Unicode 15.0.0
-// against 17.0.0): Parse's accept set, canonical output, Language, Script and
-// every Compare tier are byte-identical, while strings.EqualFold's answer
-// changed for three rune pairs in the same interval. The delta between those two
-// facts is the whole value of the ASCII gate.
+// Measured across go1.26.7 and go1.27.0 (Unicode 15.0.0 against 17.0.0):
+// Parse's accept set, canonical output, Language, Script and every Compare
+// tier are byte-identical, while strings.EqualFold's answer changed for
+// three rune pairs in the same interval.
 
 // asciiFoldSpoofs pairs a real subtag with a non-ASCII string that a Unicode
-// fold or a Unicode lowercase maps onto it. Each spoof must be REFUSED even
-// though a Unicode-aware comparison would call it equal.
-//
-// The impersonating runes are the complete set for ASCII targets, measured over
-// all 1,114,112 code points and IDENTICAL on Unicode 15 and 17: U+017F LATIN
-// SMALL LETTER LONG S folds onto S/s, U+212A KELVIN SIGN folds onto K/k, and
-// U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE lowercases to i. Unicode 17 grew
-// the fold tables by 116 runes without adding a single new ASCII impersonator,
-// so this list is stable across the bump rather than merely current.
+// fold or lowercase maps onto it; each must be refused even though a
+// Unicode-aware comparison would call it equal. Complete set for ASCII
+// targets, measured over all 1,114,112 code points, identical on Unicode 15
+// and 17.
 var asciiFoldSpoofs = map[string]struct {
 	spoof  string // the non-ASCII candidate
 	honest string // the real subtag it impersonates
@@ -60,9 +47,8 @@ var asciiFoldSpoofs = map[string]struct {
 	"dotted I for sinhala":    {"s\u0130", "si"},
 }
 
-// unicode17Changed names every rune whose classification or case mapping moved
-// between Unicode 15 and Unicode 17, measured rather than read. Each one is a
-// class of change, and none may reach an accepted tag.
+// unicode17Changed names one rune per class of change between Unicode 15 and
+// 17; none may reach an accepted tag.
 var unicode17Changed = map[string]rune{
 	// SimpleFold gained these three pairs; both members of each pair already
 	// existed in Unicode 15, so a corpus can contain them today. This is the
@@ -95,15 +81,9 @@ var unicode17Changed = map[string]rune{
 	"newly assigned letter": 0x105C0,
 }
 
-// TestParseRefusesEveryNonASCIIRune is the load-bearing test in this file: it
-// makes the ASCII-only accept set a checked contract of this package rather than
-// an inherited property of its dependency.
-//
-// It sweeps every code point above ASCII that carries a letter, a digit, or any
-// case or fold mapping — 146,465 runes on Unicode 17 — through five tag shapes
-// covering the language, script and region positions. Not one may be accepted.
-// A future change that replaced the byte gate with a Unicode-aware one, or that
-// began folding with strings.EqualFold, fails here immediately.
+// TestParseRefusesEveryNonASCIIRune sweeps every code point above ASCII that
+// carries a letter, digit, or case/fold mapping — 146,465 runes on Unicode
+// 17 — through five tag shapes; none may be accepted.
 func TestParseRefusesEveryNonASCIIRune(t *testing.T) {
 	t.Parallel()
 	probed, accepted := 0, 0
@@ -138,13 +118,9 @@ func TestParseRefusesEveryNonASCIIRune(t *testing.T) {
 	}
 }
 
-// TestParseRefusesASCIIFoldSpoofs is the per-site form of the same property,
-// and the one that explains why it matters.
-//
-// Each case asserts two things together: strings.EqualFold calls the spoof equal
-// to a real subtag, and Parse refuses it anyway. Read as a pair they show what
-// the ASCII gate buys — had this package folded subtags with EqualFold, every
-// one of these would have been accepted as the language it impersonates.
+// TestParseRefusesASCIIFoldSpoofs asserts both halves together: EqualFold or
+// ToLower calls the spoof equal to a real subtag, yet Parse refuses it — the
+// pair showing what the ASCII gate buys.
 func TestParseRefusesASCIIFoldSpoofs(t *testing.T) {
 	t.Parallel()
 	for name, tc := range asciiFoldSpoofs {
@@ -211,12 +187,10 @@ func TestParseRefusesUnicode17ChangedRunes(t *testing.T) {
 	}
 }
 
-// TestCanonicalFormIsASCII covers the output side of the same boundary.
-//
-// Tag.String is documented as usable for persistence and Tag.Language as a map
-// key, so both must be free of any rune a case-insensitive comparison could
-// collide. Any non-ASCII byte in either would put a consumer's own lookup back
-// on the wrong side of the fold tables even though this package stayed clean.
+// TestCanonicalFormIsASCII covers the output side: Tag.String is documented
+// for persistence and Tag.Language as a map key, so a non-ASCII byte in
+// either would expose a consumer's own lookup to the fold tables this
+// package avoids.
 func TestCanonicalFormIsASCII(t *testing.T) {
 	t.Parallel()
 	inputs := []string{
@@ -247,14 +221,10 @@ func TestCanonicalFormIsASCII(t *testing.T) {
 	}
 }
 
-// TestParseTierFoldsASCIIOnly covers the package's own case folding, which is
-// the one fold it does not delegate.
-//
-// ParseTier reads operator-supplied configuration, so it lowercases before
-// matching. It does so with ASCII byte arithmetic, which means a Unicode
-// spelling that a Unicode-aware fold would accept fails closed instead — and
-// failing closed here is the safe direction, because ParseTier's failure value
-// is TierNone, a floor that matches nothing.
+// TestParseTierFoldsASCIIOnly covers ParseTier's own case folding, the one
+// fold this package does not delegate: it lowercases operator-supplied
+// config with ASCII byte arithmetic, so a Unicode spelling fails closed to
+// TierNone, a floor that matches nothing.
 func TestParseTierFoldsASCIIOnly(t *testing.T) {
 	t.Parallel()
 	t.Run("ascii case and separator forms are accepted", func(t *testing.T) {

@@ -6,15 +6,11 @@ import (
 	"github.com/cplieger/langtag/v2"
 )
 
-// TestIntelligibleFloorAdmitsNoSharedLiteracy is the test that makes the
-// package's central promise checkable rather than merely stated.
-//
-// A caller at the intelligible floor is told it will accept languages that are
-// close to each other, and nothing that rests on a population happening to be
-// literate in a second language. The first version of this library shipped a
-// Catalan-to-Spanish entry on that tier, which is a shared-literacy claim
-// wearing an interchangeability label, and two independent reviews caught it
-// only by reading the reasons. This test catches it from the types.
+// TestIntelligibleFloorAdmitsNoSharedLiteracy pins that a shared-literacy claim
+// can never appear on the intelligible floor: the intelligible tier promises
+// interchangeability, not that a population happens to be literate in a
+// second language, and a mislabeled entry would defeat that from the type
+// alone rather than the reason text.
 func TestIntelligibleFloorAdmitsNoSharedLiteracy(t *testing.T) {
 	t.Parallel()
 	for _, f := range langtag.Fallbacks() {
@@ -74,14 +70,10 @@ func TestSharedLiteracyIsOneWay(t *testing.T) {
 	}
 }
 
-// TestMalformedFallbacksAreDropped is the fix for the fail-open defect two
-// reviewers found independently.
-//
-// Kind decides the tier, and its zero value used to be Intelligible, the
-// stronger of the two claims. So a caller-supplied entry that simply forgot to
-// set Kind landed a one-way relationship on the tier reserved for symmetric
-// ones, which is the exact error the Kind field exists to prevent. A malformed
-// entry now removes a substitution rather than licensing an unintended one.
+// TestMalformedFallbacksAreDropped pins that Kind has no usable zero value: an
+// entry that forgot to set it must not inherit the stronger of the two
+// curated tiers. A malformed entry removes a substitution rather than
+// licensing an unintended one.
 func TestMalformedFallbacksAreDropped(t *testing.T) {
 	t.Parallel()
 	cases := map[string]langtag.Fallback{
@@ -205,10 +197,8 @@ func TestNilComparerPreferenceFailsClosed(t *testing.T) {
 	}
 }
 
-// TestFallbackEntriesCarryProvenance keeps the table auditable. The first
-// version shipped a provenance claim ("CLDR carries no relation between the
-// two") that was false against upstream, which is why provenance is now a field
-// a reviewer can check rather than prose buried in a reason.
+// TestFallbackEntriesCarryProvenance keeps the table auditable: Provenance is
+// a field a reader can check, rather than a claim buried in Reason's prose.
 func TestFallbackEntriesCarryProvenance(t *testing.T) {
 	t.Parallel()
 	for _, f := range langtag.Fallbacks() {
@@ -292,15 +282,13 @@ func TestExcludedFamilyStaysOutAtEveryFloor(t *testing.T) {
 	}
 }
 
-// TestConflictingEntriesKeepTheFartherTier pins the order-dependence a diff
-// review found.
-//
-// Two entries can name one ordered pair, most easily when a symmetric entry's
-// reciprocal direction collides with an explicit one-way entry for the same
-// pair. Overwriting would let table order decide how close a pair is, and would
-// silently promote a declared shared-literacy claim onto the intelligible tier.
-// The farther tier wins, so a later entry can only ever narrow what a floor
-// accepts, and ValidateFallbacks names the conflict rather than hiding it.
+// TestConflictingEntriesKeepTheFartherTier pins the order-dependence that
+// arises when a symmetric entry's reciprocal direction collides with an
+// explicit one-way entry for the same pair. Overwriting would let table order
+// decide how close a pair is, and would silently promote a declared
+// shared-literacy claim onto the intelligible tier. The farther tier wins, so
+// a later entry can only ever narrow what a floor accepts, and
+// ValidateFallbacks names the conflict rather than hiding it.
 func TestConflictingEntriesKeepTheFartherTier(t *testing.T) {
 	t.Parallel()
 	table := []langtag.Fallback{
@@ -321,10 +309,10 @@ func TestConflictingEntriesKeepTheFartherTier(t *testing.T) {
 	}
 }
 
-// TestComparerMatchHonorsTheFloorContract covers the gap a diff review found: a
-// caller using a custom table reached Compare but had no Match, so it had to
-// re-implement the floor comparison and would re-inherit the fail-open bug that
-// the built-in-table Match had already been fixed for.
+// TestComparerMatchHonorsTheFloorContract pins that a caller using a custom
+// table has Match too, not only Compare: without it a caller would
+// re-implement the floor comparison and could re-introduce the fail-open bug
+// Match already guards against.
 func TestComparerMatchHonorsTheFloorContract(t *testing.T) {
 	t.Parallel()
 	c := langtag.WithFallbacks(langtag.Fallbacks())
