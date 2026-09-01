@@ -54,21 +54,16 @@ func (k Kind) String() string {
 // Fallback is one directed cross-language relationship: a reader who wants the
 // language Want can use a track in the language Have.
 //
-// Want and Have are primary language subtags after macrolanguage folding, the
-// value [Tag.Language] reports. One entry therefore covers every spelling of
-// the languages it names: a Want of "no" answers for nor, nob, no and nb
-// alike, and no second entry is needed for the umbrella tag.
+// Want and Have are primary language subtags after macrolanguage folding —
+// the value [Tag.Language] reports — so one entry covers every spelling of
+// the languages it names.
 //
-// Want and Have are both bare language subtags, so a table author CAN write
-// them in the wrong order and no type will object — the same directional
-// hazard [Preference] removes at comparison sites. What catches an authoring
-// swap is the validation seam plus review: ValidateFallbacks rejects the
-// mechanical mistakes (empty side, same-language pair, Kind/Both mismatch),
-// the Reason field forces every entry to carry its argument in the direction
-// it claims, and the provenance test keeps each claim checkable against CLDR.
-// A swapped pair whose Reason reads backwards is the review's to catch; typed
-// roles were considered and rejected here because a table LITERAL with named
-// fields (the only way entries are written) already shows both role names at
+// Both are bare strings, so a table author can write them in the wrong
+// order and no type objects; ValidateFallbacks catches the mechanical
+// mistakes (empty side, same-language pair, Kind/Both mismatch), and Reason
+// forces every entry to state its argument in the claimed direction. A
+// swapped pair whose Reason reads backwards is caught by review, not by a
+// type: a table literal with named fields already shows both role names at
 // every site.
 type Fallback struct {
 	// Want is the language subtag a reader asked for.
@@ -89,34 +84,19 @@ type Fallback struct {
 	Both bool
 }
 
-// builtinFallbacks is the curated cross-language table.
-//
-// Every entry is a claim about people, not about code, and each one is
-// arguable. Three rules govern what belongs here.
-//
-// It must not be derivable. Anything that follows from macrolanguage folding
-// or from script and region structure is already tier 0 through 2 and is a
-// fact, not a judgment: nb against no, cmn against zh, arb against ar, tl
-// against fil, sr-Cyrl against sr-Latn, and every regional variant.
-//
-// Its Kind must match its direction. Interchangeability is symmetric, because
-// that is what the claim means. Shared literacy is not: a minority-language
-// population reads the majority language and the reverse does not hold. An
-// entry claiming Intelligible in one direction only is making the weaker claim
-// under the stronger name, which is the error this table's shape exists to
-// prevent.
-//
-// Its provenance must be checkable. CLDR's languageInfo.xml is the reference
-// for whether upstream carries a relation, in which direction, and at what
-// distance. Note that golang.org/x/text embeds a CLDR snapshot old enough to
-// disagree with upstream (it does not know cs/sk or ca/es, and still carries
-// the retired mk/bg), so the file itself is the source, never the library's
-// matcher.
-//
-// The failure mode of a missing entry is that a track is left alone, which is
-// the behavior a caller had before adopting this package. The failure mode of
-// a wrong entry is a library silently rewritten into a language nobody asked
-// for. Grow this table on request, not on inference.
+// builtinFallbacks is the curated cross-language table. Every entry is a
+// claim about people, not about code, and each is arguable. Three rules
+// govern what belongs here: it must not be derivable (anything following
+// from macrolanguage folding, script or region structure is already tiers
+// 0-2 and is a fact, not a judgment); its Kind must match its direction
+// (Intelligible is symmetric, SharedLiteracy is one-way — an entry claiming
+// the former in one direction only understates itself); and its provenance
+// must be checkable against CLDR's languageInfo.xml, never against
+// golang.org/x/text's matcher, which embeds a CLDR snapshot old enough to
+// disagree with upstream (it does not know cs/sk or ca/es, and still
+// carries the retired mk/bg). A missing entry leaves a track alone; a wrong
+// entry silently rewrites a language nobody asked for — grow this table on
+// request, not on inference.
 var builtinFallbacks = []Fallback{
 	{
 		Want: "no", Have: "nn", Kind: Intelligible, Both: true,

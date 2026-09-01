@@ -47,21 +47,14 @@ var nonLanguages = map[string]struct{}{
 // private-use subtags (qaa through qtz), and for anything the IANA Language
 // Subtag Registry does not know.
 //
-// The accept set is ASCII alphanumerics only, and that is a property of the
-// grammar rather than a limitation: RFC 5646 §2.1 defines every subtag that way.
-// So case folding here is ASCII byte arithmetic, not a Unicode fold, and no
-// unicode.RangeTable, SimpleFold orbit or ToLower mapping is consulted on any
-// path. The consequence worth knowing is that Parse's answers do not move when
-// the toolchain's Unicode version does — verified across Unicode 15 and 17, over
-// which the accept set and every canonical form are byte-identical while
-// strings.EqualFold's answer changed for three rune pairs. It also means a rune
-// that a Unicode fold maps onto ASCII cannot impersonate a subtag: "İd" is not
-// Indonesian and "ſk" is not Slovak, though a Unicode-aware comparison would say
-// otherwise. See unicode_test.go, which asserts this exhaustively.
+// The accept set is ASCII alphanumerics only, per RFC 5646 §2.1's grammar, so
+// case folding here is ASCII byte arithmetic, never a Unicode fold — verified
+// byte-identical across Unicode 15 and 17 in unicode_test.go, which also
+// asserts that a rune a Unicode fold maps onto ASCII cannot impersonate a
+// subtag ("İd" is not Indonesian, "ſk" is not Slovak).
 //
-// Parse never reports an error value. Callers act on ok; there is no recovery
-// from a malformed tag beyond ignoring it, and every call site would otherwise
-// discard the error.
+// Parse never reports an error value; there is no recovery from a malformed
+// tag beyond ignoring it.
 func Parse(raw string) (Tag, bool) {
 	s := strings.TrimSpace(raw)
 	if s == "" {

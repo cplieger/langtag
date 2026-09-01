@@ -83,17 +83,12 @@ func TestCompare(t *testing.T) {
 	}
 }
 
-// TestCompareExcludesSharedLiteracy is the load-bearing regression guard.
-//
-// CLDR's distance data rates every pair below as close, because the population
-// that speaks the first language is broadly literate in the second. That is
-// accurate sociolinguistics and an unacceptable substitution rule: a viewer who
-// chose Tamil subtitles did not ask for English ones. This package excludes the
-// whole family by construction, because tiers 0 through 2 cannot express a
-// cross-language relationship at all.
-//
-// If this test fails, someone has wired a CLDR matcher back in, or added a
-// tier-3 entry from that family. Both need a deliberate decision, not a patch.
+// TestCompareExcludesSharedLiteracy is the load-bearing regression guard: CLDR
+// rates every pair below as close because the first language's population is
+// broadly literate in the second, which is accurate sociolinguistics and an
+// unacceptable substitution rule — a viewer who chose Tamil subtitles did not
+// ask for English ones. Tiers 0-2 cannot express a cross-language relation at
+// all, so this excludes the whole family by construction.
 func TestCompareExcludesSharedLiteracy(t *testing.T) {
 	t.Parallel()
 	pairs := map[string][2]string{

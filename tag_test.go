@@ -113,10 +113,9 @@ func TestParseRejects(t *testing.T) {
 	}
 }
 
-// TestParseUndeterminedDoesNotInferEnglish pins the trap that motivated using
-// Tag.Raw over Tag.Base during parsing: the underlying library answers "en" for
-// the base of "und", so a naive implementation turns every untagged track into
-// English.
+// TestParseUndeterminedDoesNotInferEnglish pins that Parse uses Tag.Raw over
+// Tag.Base: the underlying library answers "en" for the base of "und", which
+// would turn every untagged track into English.
 func TestParseUndeterminedDoesNotInferEnglish(t *testing.T) {
 	t.Parallel()
 	got, ok := langtag.Parse("und")
@@ -181,16 +180,11 @@ func TestMustParsePanicsOnBadInput(t *testing.T) {
 	_ = langtag.MustParse("pob")
 }
 
-// FuzzParse guards the untrusted-input boundary. Language identifiers reach
-// this package from Plex metadata, ffprobe output and third-party APIs, so
-// every invariant a caller relies on is asserted here rather than assumed.
-//
-// The non-ASCII seeds are one per class of Unicode 15 -> 17 change, because the
-// committed corpus is the durable fuzz coverage and coverage-guided exploration
-// is unlikely to construct these runes on its own. Each class and the rune
-// standing for it is documented in unicode_test.go; the charset boundary they
-// probe is asserted exhaustively there, and seeded here so the round-trip and
-// tier invariants below also run against them.
+// FuzzParse guards the untrusted-input boundary: language identifiers reach
+// this package from Plex metadata, ffprobe output and third-party APIs. The
+// non-ASCII seeds are one per class of Unicode 15 -> 17 change (documented in
+// unicode_test.go), seeded here so the round-trip and tier invariants below
+// also run against them.
 func FuzzParse(f *testing.F) {
 	for _, seed := range []string{
 		"", " ", "en", "ENG", "nob", "nor", "und", "zxx", "mul", "mis", "qaa",

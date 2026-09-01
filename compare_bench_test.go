@@ -7,64 +7,25 @@ import (
 	"github.com/cplieger/langtag/v2"
 )
 
-// This file exists because the tier ladder is the half of langtag that is
-// entirely first-party policy, and it is the half a consumer runs in a loop. A
-// regression here cannot be blamed on a dependency, and it cannot be seen in the
-// parse numbers either: parse and compare are separate cost centres, measured
-// separately here because measuring them together would let a slowdown in one
-// hide behind the other. Parse costs one to two orders of magnitude more than a
-// comparison (on one developer machine, 270-440 ns against 4-25 ns), so a
-// combined number would be a parse number with rounding error where the tier
-// policy used to be.
+// Compare and Parse are measured separately because Parse costs one to two
+// orders of magnitude more (270-440 ns against 4-25 ns on one developer
+// machine), so a combined number would hide a regression in the tier ladder
+// inside parse noise. BenchmarkPreferenceAcrossTracks charts the shape a
+// consumer actually runs: one Preference judging many tracks, reused rather
+// than rebuilt per candidate.
 //
-// The shape that actually multiplies is one Preference judging many tracks:
-// plex-language-sync grades every available subtitle and audio track of every
-// episode against one stored choice. BenchmarkPreferenceAcrossTracks charts that
-// shape, and charts the rebuild-per-candidate variant beside it so the cost of
-// the idiom a caller reaches for when it passes a Tag down instead of a
-// Preference stays on the record rather than being re-argued.
+// TestPreferenceCompareIsAllocationFree and
+// TestBestDoesNotAllocateWhenNothingMatches gate allocation counts that were
+// measured to hold before being asserted; the benchmarks below feed the
+// tracker, one series per distinct path through the ladder so a regression in
+// one path is not averaged away by the others. Neither allocation contract
+// calls t.Parallel: testing.AllocsPerRun pins GOMAXPROCS to 1 for its
+// measurement window, so a concurrent sibling's allocations would be
+// misattributed.
 //
-// Two kinds of check, doing different jobs:
-//
-//   - TestPreferenceCompareIsAllocationFree and
-//     TestBestDoesNotAllocateWhenNothingMatches GATE properties that were
-//     MEASURED to hold before they were asserted. Comparison is the innermost
-//     loop of the library, so an allocation introduced there is multiplied by
-//     tracks times episodes; testing.AllocsPerRun is exact, so the assertions are
-//     "== 0" and a future fmt call, string build or interface boxing in the
-//     comparison path goes red at merge time rather than showing up later as a
-//     chart that moved.
-//   - The benchmarks feed the tracker. BenchmarkCompare charts one series per
-//     distinct path through the ladder rather than one number for the whole of
-//     it, because the paths do different amounts of work and a regression in one
-//     would be invisible in an average over all of them.
-//     BenchmarkCompareFallbackBucket is size-parameterised so a map lookup
-//     turning into a scan shows as a super-linear jump between sizes rather than
-//     a uniform slowdown that reads as runner noise.
-//
-// Neither contract below calls t.Parallel, deliberately: testing.AllocsPerRun
-// measures a delta on a process-global allocation counter and pins GOMAXPROCS to
-// 1 while it runs, so a concurrent sibling's allocations would be charged to
-// whichever contract happened to be measuring.
-//
-// Three measurements taken while writing this, recorded because they decide what
-// is charted and what is not. Absolute figures are from one developer machine and
-// are quoted for their ratios, which is what survives a different runner:
-//
-//   - Compare does NOT walk the fallback table. It reads the wanted language's
-//     bucket with a map index and the available language out of that bucket with
-//     a second one (compare.go), so grading is O(1) in table size and only
-//     WithFallbacks is linear in it. BenchmarkCompareFallbackBucket asserts that
-//     division of labour by charting it: those series must stay flat.
-//   - WithFallbacks is linear as intended (2.1 us, 34 us and 707 us for 8, 128
-//     and 2048 entries: 16x the entries for 16x to 21x the time). It is not
-//     charted because it runs once per process at startup, and the package's
-//     benchmark budget buys more from a path a consumer runs per track.
-//   - Preference.Best costs the Compare loop below plus one slice append per
-//     candidate that ties at the best tier (296 ns and 1 allocation over 8
-//     tracks, 2.4 us and 4 over 64). A series for it would be ~90% the same
-//     measurement as reuse_tracks_N, so its cost rides those series and its
-//     allocation behaviour is gated by the test instead.
+// Compare does not walk the fallback table — it is two map lookups
+// (compare.go) — so BenchmarkCompareFallbackBucket's two series must stay
+// flat regardless of table size; that is the property it charts.
 
 // compareSink* consume every result these benchmarks produce. b.Loop keeps the
 // call itself from being elided, but a return value nothing reads is still
@@ -78,41 +39,24 @@ var (
 	compareSinkPref langtag.Preference
 )
 
-// tierPair is one wanted/available pair together with the tier it must grade to.
-//
-// Each case states its expected tier so the fixture cannot silently drift onto
-// another path: if a table edit moved sr-Latn/sr-Cyrl off TierSameLanguage, the
-// benchmark would keep running and would quietly chart the other-script branch
-// under the close-script name, and a chart series name is permanent.
+// tierPair is one wanted/available pair together with the tier it must grade
+// to, so a fixture drift onto another path is caught before it is measured.
 type tierPair struct {
 	name string
 	want string
 	have string
 	tier langtag.Tier
-	// charted records whether this pair gets its own benchmark series. Every
-	// pair is measured for allocations, because each is a documented tier case a
-	// consumer can reach; only pairs with a DISTINCT cost path are charted,
-	// because a second series over the same branch buys a second chart to read
-	// and another ~1.2 s of every weekly run.
+	// charted marks a pair with a distinct cost path; every pair is still
+	// checked for allocations regardless.
 	charted bool
 }
 
-// tierPairs covers every tier the ladder defines, plus the two extra branches
-// inside TierSameLanguage. Built as a literal, deliberately: the weekly tracker
-// runs with -run='^$', so no Test function executes first, and a benchmark
-// leaning on state that a Test populated would pass locally and fail there.
-//
-// The three same-language entries reach that tier by different work: a
-// macrolanguage fold, a region-only difference, and a CLDR-vouched script pair.
-// The last is the only linear scan anywhere in the comparison path
-// (scriptsReadAsOne in scripts.go) and measured four times the cost of the other
-// two, so it is charted and the region case is not — region and macro fold are
-// the same branch, "one language, same script".
-//
-// shared_literacy is likewise uncharted: reaching it is the same single map
-// lookup that reaches intelligible, and the tier differs only by which value was
-// stored in the table at construction. The tier is not untested — the allocation
-// contract covers it and compare_test.go owns its correctness.
+// tierPairs covers every tier the ladder defines. same_language_close_script
+// is the only linear scan in the comparison path (scriptsReadAsOne in
+// scripts.go) and is charted separately from the macro/region same-language
+// cases, which share a branch. shared_literacy is uncharted because it
+// reaches the same map lookup as intelligible; compare_test.go covers its
+// correctness.
 func tierPairs() []tierPair {
 	return []tierPair{
 		{"identical", "ger", "deu", langtag.TierIdentical, true},
@@ -126,20 +70,11 @@ func tierPairs() []tierPair {
 	}
 }
 
-// TestPreferenceCompareIsAllocationFree pins the cost of the innermost loop of
-// the library.
-//
-// Every exported method a comparison site calls is covered, not just Compare,
-// because a consumer's loop body is realistically Compare or Match plus Reason on
-// the surprising answers, and an allocation in any of them is multiplied by
-// tracks times episodes. Prefer is included because the build-once idiom the API
-// is shaped around depends on construction being cheap enough that rebuilding is
-// a style question rather than a cost one.
-//
-// The zero-tag case is its own subtest: it is the answer for every input a
-// consumer failed to parse, and compare.go returns TierNone before touching the
-// table, so it must stay the cheapest comparison in the library rather than
-// becoming the most expensive.
+// TestPreferenceCompareIsAllocationFree pins that every exported method a
+// comparison site calls costs nothing on the heap: an allocation here is
+// multiplied by tracks times episodes. The zero-tag case is separate because
+// compare.go returns TierNone before touching the table, so it must stay the
+// cheapest comparison rather than becoming the most expensive.
 func TestPreferenceCompareIsAllocationFree(t *testing.T) {
 	for _, pair := range tierPairs() {
 		t.Run(pair.name, func(t *testing.T) {
@@ -187,16 +122,10 @@ func TestPreferenceCompareIsAllocationFree(t *testing.T) {
 	})
 }
 
-// TestBestDoesNotAllocateWhenNothingMatches pins the fail-closed path's cost.
-//
-// Best returns a slice, so it allocates as soon as it has something to return,
-// and it is not expected to be free in general (measured: one allocation for a
-// single match). The property that matters is the other direction. A consumer
-// asks Best about every episode, and for a library of tracks tagged in languages
-// nobody asked for the answer is "nothing close enough" — so the no-match path is
-// the one that runs most, and it must cost nothing but the scan. compare.go leaves
-// the output slice nil until a candidate lands within the floor; this keeps it
-// that way.
+// TestBestDoesNotAllocateWhenNothingMatches pins the fail-closed path's cost:
+// a library of tracks tagged in languages nobody asked for hits this path
+// most often, and compare.go leaves the output slice nil until a candidate
+// lands within the floor, so it must cost only the scan.
 func TestBestDoesNotAllocateWhenNothingMatches(t *testing.T) {
 	const floor = langtag.TierIntelligible
 
@@ -245,16 +174,11 @@ func BenchmarkCompare(b *testing.B) {
 	}
 }
 
-// BenchmarkCompareFallbackBucket answers whether grading walks the fallback
-// table, by charting one lookup against buckets 256 times apart in size.
-//
-// Today it does not walk it: compare reads the wanted language's bucket with a
-// map index and the available language out of it with a second one, so these two
-// series should sit on top of each other. That flatness is the point of the
-// family. Replacing either map with a slice is an easy-looking change — the
-// built-in table has five entries and a scan of five beats a map — and it would
-// send this family super-linear while every other series in the package stayed
-// put, which names the regression precisely.
+// BenchmarkCompareFallbackBucket charts one lookup against buckets 256 times
+// apart in size, to catch a future map-to-slice change: compare reads the
+// wanted language's bucket with one map index and the available language out
+// of it with a second, so these two series must stay flat regardless of
+// table size.
 func BenchmarkCompareFallbackBucket(b *testing.B) {
 	want := langtag.MustParse("no")
 	have := langtag.MustParse("sv")
@@ -275,23 +199,12 @@ func BenchmarkCompareFallbackBucket(b *testing.B) {
 	}
 }
 
-// BenchmarkPreferenceAcrossTracks charts the shape a consumer actually runs: one
-// wanted language judged against every track an episode offers.
-//
-// reuse builds the Preference once outside the track loop, which is the idiom the
-// API is designed around and what both consumers do. It is parameterised by track
-// count so per-track cost is separable from per-episode overhead, and so a
-// comparison loop that became quadratic in candidates would show as a
-// super-linear jump between the sizes.
-//
-// rebuild constructs a Preference per candidate, which is what a caller does when
-// it threads the wanted Tag down instead of the Preference. It is charted at the
-// larger size only: measured over three runs, rebuilding costs 1 to 2 ns per
-// candidate — 5 to 6% of the loop, and zero allocations either way — so at 8
-// tracks the difference sits inside this machine's own run-to-run spread and a
-// series for it would chart noise forever. The gap is what the idiom costs,
-// charted rather than argued so the answer stays current: if constructing a
-// Preference ever stops being a struct copy, this pair separates first.
+// BenchmarkPreferenceAcrossTracks charts the shape a consumer actually runs:
+// one wanted language judged against every track an episode offers. reuse
+// builds the Preference once outside the track loop (the idiom both
+// consumers use); rebuild constructs one per candidate, charted at 64 tracks
+// only — rebuilding costs 1-2 ns per candidate, inside this machine's
+// run-to-run spread at 8.
 func BenchmarkPreferenceAcrossTracks(b *testing.B) {
 	// A plausible mixed-language episode: a few tracks that grade at various
 	// tiers and a majority that do not match at all.
@@ -322,14 +235,8 @@ func BenchmarkPreferenceAcrossTracks(b *testing.B) {
 	})
 }
 
-// benchTracks builds n parsed tags by cycling through langs, which is the shape
-// of a real candidate list: a handful of languages, several of them repeated
-// across tracks.
-//
-// It is a function rather than a package-level table so nothing here depends on
-// initialization order, and it parses during setup so no benchmark pays parse
-// cost inside its timed loop. Keeping the two cost centres apart is the whole
-// point of splitting this file from tag_bench_test.go.
+// benchTracks builds n parsed tags by cycling through langs, parsing during
+// setup so no benchmark pays parse cost inside its timed loop.
 func benchTracks(n int, langs ...string) []langtag.Tag {
 	out := make([]langtag.Tag, 0, n)
 	for i := range n {
@@ -338,16 +245,10 @@ func benchTracks(n int, langs ...string) []langtag.Tag {
 	return out
 }
 
-// benchFallbackTable builds a table of n valid entries that all name "no" as the
-// wanted language, so every entry lands in one bucket and the entry a lookup has
-// to find sits in a bucket of size n. That is the shape in which a scan would be
-// visible; a table of n entries spread over n buckets would not show one.
-//
-// The stand-in languages are synthetic three-letter subtags. The table accepts
-// them because entries are bare strings matched against [langtag.Tag.Language]
-// and are never validated against the IANA registry, and none of them is the
-// folded language of any real tag these benchmarks parse, so the only reachable
-// entry is the last one: "no" -> "sv".
+// benchFallbackTable builds a table of n entries all naming "no" as the
+// wanted language, so they land in one bucket and a scan would be visible.
+// The stand-in Have values are synthetic and never match a real tag, so the
+// only reachable entry is the last: "no" -> "sv".
 func benchFallbackTable(n int) []langtag.Fallback {
 	const (
 		letters = "abcdefghijklmnopqrstuvwxyz"
