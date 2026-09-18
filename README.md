@@ -1,8 +1,6 @@
 # langtag
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/cplieger/langtag/v2.svg)](https://pkg.go.dev/github.com/cplieger/langtag/v2)
-[![Go version](https://img.shields.io/github/go-mod/go-version/cplieger/langtag)](https://github.com/cplieger/langtag/blob/main/go.mod)
-[![Mutation](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/langtag/badges/mutation.json)](https://github.com/cplieger/langtag/issues?q=label%3Agremlins-tracker)
+[![Go Reference](https://pkg.go.dev/badge/github.com/cplieger/langtag/v2.svg)](https://pkg.go.dev/github.com/cplieger/langtag/v2) [![Go version](https://img.shields.io/github/go-mod/go-version/cplieger/langtag)](https://github.com/cplieger/langtag/blob/main/go.mod) [![Mutation](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/langtag/badges/mutation.json)](https://github.com/cplieger/langtag/issues?q=label%3Agremlins-tracker)
 
 > May this language track stand in for the one that was asked for, and how far a substitution is that
 
