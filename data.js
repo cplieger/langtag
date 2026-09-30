@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790123887641,
-  "repoUrl": "https://github.com/cplieger/langtag",
+  "lastUpdate": 1790732096011,
+  "repoUrl": "https://github.com/cplieger/ci",
   "entries": {
     "Benchmark": [
       {
@@ -2398,6 +2398,406 @@ window.BENCHMARK_DATA = {
             "name": "BenchmarkPreferenceAcrossTracks/reuse_tracks_8",
             "value": 271.9,
             "range": "± 0.8",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Christopher Plieger",
+            "username": "cplieger",
+            "email": "917744+cplieger@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "48d1c682390d6a54c634f3df4594be7c938087f9",
+          "message": "chore(deps): update cplieger/ci digest to 1cc06fd (#659)",
+          "timestamp": "2026-09-24T22:02:23Z",
+          "url": "https://github.com/cplieger/ci/commit/48d1c682390d6a54c634f3df4594be7c938087f9"
+        },
+        "date": 1790732095669,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkCompare/identical - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/identical - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/identical",
+            "value": 8.9125,
+            "range": "± 0.0465",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/intelligible - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/intelligible - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/intelligible",
+            "value": 33.37,
+            "range": "± 0.425",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/none - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/none - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/none",
+            "value": 34.53,
+            "range": "± 0.13",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/other_script - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/other_script - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/other_script",
+            "value": 18.52,
+            "range": "± 0.435",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/same_language_close_script - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/same_language_close_script - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/same_language_close_script",
+            "value": 24.2,
+            "range": "± 0.305",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/same_language_macro - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/same_language_macro - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompare/same_language_macro",
+            "value": 11.24,
+            "range": "± 0.04",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompareFallbackBucket/bucket_2048 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompareFallbackBucket/bucket_2048 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompareFallbackBucket/bucket_2048",
+            "value": 40.93,
+            "range": "± 0.055",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompareFallbackBucket/bucket_8 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompareFallbackBucket/bucket_8 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkCompareFallbackBucket/bucket_8",
+            "value": 37.18,
+            "range": "± 0.12",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/already_canonical_full - B/op",
+            "value": 240,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/already_canonical_full - allocs/op",
+            "value": 4,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/already_canonical_full",
+            "value": 621.3,
+            "range": "± 3.4",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/canonicalized_alpha3 - B/op",
+            "value": 232,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/canonicalized_alpha3 - allocs/op",
+            "value": 4,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/canonicalized_alpha3",
+            "value": 586.2,
+            "range": "± 2.45",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/empty - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/empty - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/empty",
+            "value": 12.06,
+            "range": "± 0.005",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/grandfathered - B/op",
+            "value": 73,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/grandfathered - allocs/op",
+            "value": 5,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/grandfathered",
+            "value": 451.5,
+            "range": "± 5.85",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/plain_alpha2 - B/op",
+            "value": 228,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/plain_alpha2 - allocs/op",
+            "value": 3,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/plain_alpha2",
+            "value": 516.2,
+            "range": "± 4.75",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/script_and_region - B/op",
+            "value": 240,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/script_and_region - allocs/op",
+            "value": 4,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/script_and_region",
+            "value": 636.7,
+            "range": "± 3.55",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/unparseable - B/op",
+            "value": 128,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/unparseable - allocs/op",
+            "value": 1,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkParse/unparseable",
+            "value": 133.25,
+            "range": "± 2.05",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPreferenceAcrossTracks/rebuild_tracks_64 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPreferenceAcrossTracks/rebuild_tracks_64 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPreferenceAcrossTracks/rebuild_tracks_64",
+            "value": 2290,
+            "range": "± 2",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPreferenceAcrossTracks/reuse_tracks_64 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPreferenceAcrossTracks/reuse_tracks_64 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPreferenceAcrossTracks/reuse_tracks_64",
+            "value": 2020.5,
+            "range": "± 11.5",
+            "unit": "ns/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPreferenceAcrossTracks/reuse_tracks_8 - B/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "B/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPreferenceAcrossTracks/reuse_tracks_8 - allocs/op",
+            "value": 0,
+            "range": "± 0",
+            "unit": "allocs/op",
+            "extra": "10 samples, median"
+          },
+          {
+            "name": "BenchmarkPreferenceAcrossTracks/reuse_tracks_8",
+            "value": 263.65,
+            "range": "± 2",
             "unit": "ns/op",
             "extra": "10 samples, median"
           }
