@@ -47,14 +47,11 @@ var closeScripts = []CloseScript{
 	},
 }
 
-// CloseScripts returns a copy of the built-in list of script pairs that read as
-// one language.
-//
-// Unlike [Fallbacks], this list is not replaceable. It records where CLDR states
-// an explicit symmetric distance for a script pair, which is a fact about the
-// data rather than a judgment about people, so a deployment has nothing to
-// disagree with. A caller that wants a script difference treated as a barrier
-// anyway floors at [TierSameLanguage] and gets that.
+// CloseScripts returns a copy of the built-in, non-replaceable list of script
+// pairs CLDR rates as one language. A close pair matches at
+// [TierSameLanguage]; to treat a script difference as a barrier, compare
+// [Tag.Script] or floor at [TierIdentical], which also refuses region
+// differences.
 func CloseScripts() []CloseScript {
 	return slices.Clone(closeScripts)
 }
