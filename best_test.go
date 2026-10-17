@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cplieger/langtag/v2"
+	"github.com/cplieger/langtag/v3"
 )
 
 // track models a caller's own candidate type, to exercise that Best works
@@ -143,14 +143,14 @@ func TestBestCapsFloorAtSensitive(t *testing.T) {
 	}
 }
 
-func TestWithFallbacksNilDisablesTierThree(t *testing.T) {
+func TestWithFallbacksNilDisablesCrossLanguageTiers(t *testing.T) {
 	t.Parallel()
 	c := langtag.WithFallbacks(nil)
 	nob, nn := langtag.MustParse("nob"), langtag.MustParse("nn")
 	if got := c.Prefer(nob).Compare(nn); got != langtag.TierNone {
 		t.Errorf("WithFallbacks(nil).Prefer(nob).Compare(nn) = %v, want %v", got, langtag.TierNone)
 	}
-	// Tiers 0 to 2 are structural and must be unaffected by the table.
+	// Tiers 0 to 3 are structural and must be unaffected by the table.
 	if got := c.Prefer(nob).Compare(langtag.MustParse("nor")); got != langtag.TierSameLanguage {
 		t.Errorf("WithFallbacks(nil).Prefer(nob).Compare(nor) = %v, want %v", got, langtag.TierSameLanguage)
 	}
@@ -223,7 +223,10 @@ func TestFallbacksTable(t *testing.T) {
 		{"no", "nn", true},
 		{"no", "da", true},
 		{"hr", "bs", true},
+		{"sr", "hr", true},
+		{"sr", "bs", true},
 		{"cs", "sk", true},
+		{"ms", "id", true},
 		{"ca", "es", false},
 	}
 	got := langtag.Fallbacks()
@@ -290,6 +293,7 @@ func TestParseTier(t *testing.T) {
 		"identical":           {"identical", langtag.TierIdentical, true},
 		"same-language":       {"same-language", langtag.TierSameLanguage, true},
 		"underscore form":     {"same_language", langtag.TierSameLanguage, true},
+		"other-region":        {"other-region", langtag.TierOtherRegion, true},
 		"uppercase":           {"OTHER-SCRIPT", langtag.TierOtherScript, true},
 		"mixed with spaces":   {" Intelligible ", langtag.TierIntelligible, true},
 		"shared literacy":     {"shared-literacy", langtag.TierSharedLiteracy, true},
@@ -314,7 +318,7 @@ func TestParseTier(t *testing.T) {
 func TestTierStringRoundTrips(t *testing.T) {
 	t.Parallel()
 	for _, tier := range []langtag.Tier{
-		langtag.TierIdentical, langtag.TierSameLanguage,
+		langtag.TierIdentical, langtag.TierSameLanguage, langtag.TierOtherRegion,
 		langtag.TierOtherScript, langtag.TierIntelligible, langtag.TierSharedLiteracy,
 	} {
 		s := tier.String()

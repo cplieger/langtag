@@ -8,6 +8,12 @@
 # Test binary
 *.test
 
+# go build output of a generator, named after its directory
+/internal/gen/containment/containment
+/internal/gen/likely/likely
+/internal/gen/names/names
+/internal/gen/pin/pin
+
 # Output of go coverage
 *.out
 
@@ -19,7 +25,7 @@ go.work.sum
 .idea/
 .vscode/
 
-# Kiro skill artifacts (app-review, judgement, steering-maintenance)
+# Local agent state
 **/.app-review/
 **/.judgement/
 **/.steering-maintenance/

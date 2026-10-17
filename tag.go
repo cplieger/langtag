@@ -3,6 +3,7 @@ package langtag
 import (
 	"strings"
 
+	"github.com/cplieger/langtag/v3/internal/multiscript"
 	"golang.org/x/text/language"
 )
 
@@ -12,8 +13,8 @@ import (
 // language, and it matches nothing at any tier, including another zero Tag.
 // Two tracks both tagged "undetermined" are not known to share a language.
 //
-// Tag holds only strings, so it is comparable, copyable and carries no
-// reference to the parsing library in its public shape.
+// Tag holds only strings and values derived from canon, so == is canonical
+// equality and its public shape carries no reference to the parsing library.
 type Tag struct {
 	// canon is the canonical BCP 47 form, empty for the zero Tag. It decides
 	// TierIdentical and is what String reports.
@@ -22,10 +23,18 @@ type Tag struct {
 	// that nb and no share "no" and cmn and zh share "zh". It decides whether
 	// two tags name the same language.
 	macroBase string
-	// script is the ISO 15924 script, resolved through CLDR's default-script
-	// data when the tag does not state one, so that a bare "zh" compares equal
-	// to "zh-Hans" and a bare "sr" to "sr-Cyrl".
+	// script is the ISO 15924 script: the stated one, else the generated CLDR
+	// table's (scripts.go resolveScript), so that a bare "zh" compares equal to
+	// "zh-Hans" and a bare "sr" to "sr-Cyrl".
 	script string
+	// scriptAt and regionAt index the stated script and region subtags in
+	// canon, 0 when absent (index 0 is the language). Offsets rather than
+	// strings keep Tag small enough to pass by value; the region is canon's
+	// last subtag because Parse composes only language, script and region.
+	scriptAt, regionAt uint8
+	// multiScript reports that the table holds region rows for the tag's
+	// subtag or its macroBase.
+	multiScript bool
 }
 
 // nonLanguages are well-formed subtags that name no specific language. They
@@ -38,23 +47,14 @@ var nonLanguages = map[string]struct{}{
 	"mis": {}, // uncoded languages
 }
 
-// Parse canonicalizes one raw language identifier from an untrusted source.
-//
-// It accepts ISO 639-1, ISO 639-2 (bibliographic or terminological), ISO 639-3
-// and BCP 47 tags, in any ASCII letter case, with surrounding whitespace. ok is
-// false, and the returned Tag is the zero Tag, for the empty string, for the
-// placeholder subtags that name no language (und, zxx, mul, mis), for
-// private-use subtags (qaa through qtz), and for anything the IANA Language
-// Subtag Registry does not know.
-//
-// The accept set is ASCII alphanumerics only, per RFC 5646 §2.1's grammar, so
-// case folding here is ASCII byte arithmetic, never a Unicode fold — verified
-// byte-identical across Unicode 15 and 17 in unicode_test.go, which also
-// asserts that a rune a Unicode fold maps onto ASCII cannot impersonate a
-// subtag ("İd" is not Indonesian, "ſk" is not Slovak).
-//
-// Parse never reports an error value; there is no recovery from a malformed
-// tag beyond ignoring it.
+// Parse canonicalizes one raw language identifier from an untrusted source:
+// ISO 639-1, ISO 639-2 (bibliographic or terminological), ISO 639-3 or BCP 47,
+// in any ASCII letter case, with surrounding whitespace. ok is false, with the
+// zero Tag, for the empty string, the subtags naming no language (und, zxx,
+// mul, mis), private-use subtags (qaa through qtz) and anything the IANA
+// Language Subtag Registry does not know. Case folding is ASCII only, per
+// RFC 5646 §2.1, so a rune a Unicode fold maps onto ASCII cannot impersonate
+// a subtag ("İd" is not Indonesian, "ſk" is not Slovak).
 func Parse(raw string) (Tag, bool) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
@@ -88,27 +88,31 @@ func Parse(raw string) (Tag, bool) {
 		return Tag{}, false
 	}
 
-	macro, err := language.Macro.Canonicalize(composed)
-	if err != nil {
-		// Canonicalization of an already-parsed tag does not fail in practice.
-		// Fall back to the parsed tag rather than rejecting a valid language.
-		macro = composed
-	}
-	macroBase, _, _ := macro.Raw()
+	own, macroBase := multiscript.Subtags(composed)
 
-	// Tag.Script resolves an unstated script through CLDR's default-script
-	// data rather than reporting nothing, which is what makes a bare "zh" and
-	// an explicit "zh-Hans" one language instead of a script difference. The
-	// confidence it also returns distinguishes stated from inferred, and is
-	// deliberately ignored: for deciding whether two tags are written the same
-	// way, an inferred Latn is as good as a stated one.
-	script, _ := composed.Script()
-
-	return Tag{
+	// The script and region come from the composed tag, never from x/text's
+	// likely-subtags data, which lags CLDR (zh-MY resolves to Hant there): an
+	// unstated script is read from the pinned table instead.
+	_, script, region := composed.Raw()
+	out := Tag{
 		canon:     composed.String(),
-		macroBase: macroBase.String(),
-		script:    script.String(),
-	}, true
+		macroBase: macroBase,
+	}
+	// x/text reports an absent subtag as the zero value, whose String is a
+	// real code ("Zzzz", "ZZ"), so absence is tested on the value. canon is
+	// lang[-Script][-Region], which fixes both offsets.
+	if script != (language.Script{}) {
+		out.scriptAt = uint8(len(own) + 1) //nolint:gosec // a language subtag is at most 8 bytes (RFC 5646)
+	}
+	if region != (language.Region{}) {
+		out.regionAt = uint8(strings.LastIndexByte(out.canon, '-') + 1) //nolint:gosec // canon, lang-Script-Region, is at most 17 bytes
+	}
+	out.script = out.StatedScript()
+	if out.script == "" {
+		out.script = resolveScript(own, out.macroBase, out.Region())
+	}
+	out.multiScript = multiscript.Holds(hasRegionRows, own, out.macroBase)
+	return out, true
 }
 
 // isPrivateUse reports whether a primary language subtag falls in the
@@ -152,6 +156,32 @@ func (t Tag) IsZero() bool { return t.canon == "" }
 // fragment across the code systems that name one language several ways.
 func (t Tag) Language() string { return t.macroBase }
 
-// Script returns the ISO 15924 script code, resolved to CLDR's default for
-// the language when the tag itself does not state one.
+// Script returns the ISO 15924 script code. When the tag states none it is
+// CLDR's likely script for the tag's language and region, read from a table
+// generated from a pinned CLDR release, or "Zzzz" when CLDR gives none. It is
+// "" for the zero Tag.
 func (t Tag) Script() string { return t.script }
+
+// StatedScript returns the script subtag the canonical form states, or ""
+// when it states none.
+func (t Tag) StatedScript() string {
+	if t.scriptAt == 0 {
+		return ""
+	}
+	return t.canon[t.scriptAt : t.scriptAt+4]
+}
+
+// Region returns the region subtag the canonical form states ("BR", "419"),
+// or "" when it states none.
+func (t Tag) Region() string {
+	if t.regionAt == 0 {
+		return ""
+	}
+	return t.canon[t.regionAt:]
+}
+
+// MultiScript reports whether CLDR writes the tag's language in a script
+// that varies by region: the script table holds a region row for the tag's
+// own subtag or for its [Tag.Language] (kmr through ku). For such a language
+// a tag stating a region but no script leaves the script to that region.
+func (t Tag) MultiScript() bool { return t.multiScript }

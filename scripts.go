@@ -1,6 +1,74 @@
 package langtag
 
-import "slices"
+import (
+	"cmp"
+	"slices"
+	"strings"
+)
+
+// unknownScript is ISO 15924's code for an undetermined script, what a tag
+// resolves to when it states no script and the table holds no row for it.
+const unknownScript = "Zzzz"
+
+// languageScript and regionScript are the rows of scripttable.go, generated
+// from the pinned CLDR likelySubtags.xml. languageScripts is sorted by
+// language and regionScripts by language then region; the lookups below
+// binary-search them, so an unsorted table answers wrongly
+// (TestScriptTableSorted).
+type languageScript struct{ language, script string }
+
+type regionScript struct{ language, region, script string }
+
+// resolveScript is CLDR's likely-subtags lookup restricted to the script: the
+// first row keyed <lang>_<region>, <macro>_<region>, <lang>, <macro>, else
+// unknown. lang is the tag's own primary subtag and macro its macrolanguage,
+// so cmn-MY and zh-MY agree though CLDR keys only zh.
+func resolveScript(lang, macro, region string) string {
+	if region != "" {
+		if s, ok := regionRow(lang, region); ok {
+			return s
+		}
+		if s, ok := regionRow(macro, region); ok {
+			return s
+		}
+	}
+	if s, ok := languageRow(lang); ok {
+		return s
+	}
+	if s, ok := languageRow(macro); ok {
+		return s
+	}
+	return unknownScript
+}
+
+func languageRow(lang string) (string, bool) {
+	i, ok := slices.BinarySearchFunc(languageScripts, lang, func(r languageScript, l string) int {
+		return strings.Compare(r.language, l)
+	})
+	if !ok {
+		return "", false
+	}
+	return languageScripts[i].script, true
+}
+
+func regionRow(lang, region string) (string, bool) {
+	i, ok := slices.BinarySearchFunc(regionScripts, regionScript{language: lang, region: region}, compareRegionRows)
+	if !ok {
+		return "", false
+	}
+	return regionScripts[i].script, true
+}
+
+// hasRegionRows reports whether the table holds any region row for lang,
+// meaning CLDR writes lang in a script that varies by region.
+func hasRegionRows(lang string) bool {
+	i, _ := slices.BinarySearchFunc(regionScripts, regionScript{language: lang}, compareRegionRows)
+	return i < len(regionScripts) && regionScripts[i].language == lang
+}
+
+func compareRegionRows(a, b regionScript) int {
+	return cmp.Or(strings.Compare(a.language, b.language), strings.Compare(a.region, b.region))
+}
 
 // CloseScript is a pair of scripts that one language's readers move between
 // freely, so a difference between them is not a barrier the way a script
@@ -22,24 +90,15 @@ type CloseScript struct {
 }
 
 // closeScripts promotes a same-language script difference from
-// [TierOtherScript] to [TierSameLanguage].
-//
-// Unlike the cross-language table, this list is derived, not judged: CLDR's
-// languageInfo.xml gives a generic same-language cross-script distance of
-// 50 and names only a few specific pairs, of which all but one are one-way
-// transliteration rows (romanization feeding its native script, not two
-// audiences reading each other — the same reason a one-way language
-// relation is shared literacy). The one symmetric pair, Serbian, earns the
-// promotion twice: CLDR rates it 5, and Serbian schooling teaches both
-// scripts.
-//
-// Deliberately absent: Simplified/Traditional Chinese (CLDR names no
-// distance, so it sits at the generic 50), and uz-Latn/uz-Cyrl,
-// az-Latn/az-Cyrl (x/text's stale snapshot rates them close but upstream
-// CLDR does not name either).
+// [TierOtherScript] to [TierSameLanguage]. It is derived from CLDR's
+// languageInfo.xml, not judged: of the few pairs it names against the generic
+// cross-script distance of 50, all but Serbian's are one-way transliteration
+// rows. Serbian is symmetric at 5, and its schooling teaches both scripts.
+// Absent on purpose: Simplified/Traditional Chinese (no named distance) and
+// uz or az Latn/Cyrl (close only in x/text's stale snapshot).
 var closeScripts = []CloseScript{
 	{
-		Language: "sr", A: "Latn", B: "Cyrl",
+		Language: "sr", A: scriptLatn, B: scriptCyrl,
 		Reason: "Serbian is written in both scripts and schooling in Serbia " +
 			"teaches both, so a reader handles either without effort.",
 		Provenance: "CLDR languageInfo.xml, sr_Latn <-> sr_Cyrl, distance 5, " +

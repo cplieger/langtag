@@ -1,0 +1,229 @@
+# Moves langtag's one CLDR pin, internal/gen/cldr/cldr.go, to the newest CLDR
+# release and opens one pull request against dev with the pin, the
+# regenerated tables, the names golden and a report of the script table's
+# change. A run does nothing when the pin already names both the CLDR release
+# and its newest cldr-json release.
+#
+# The pull request is pushed and opened with the tribble-trouble App's token
+# (secrets SYNC_APP_ID and SYNC_APP_PRIVATE_KEY, as cplieger/ci's sync.yaml):
+# a GITHUB_TOKEN-created pull request starts no CI run, so ci / validate would
+# never report on it.
+name: CLDR refresh
+
+on:
+  schedule:
+    - cron: "17 5 3 * *"   # the 3rd of each month, 05:17 UTC
+  workflow_dispatch:
+    inputs:
+      cldr_tag:
+        description: "CLDR release tag, such as release-48-2 (default: the latest release); the names follow its newest cldr-json release"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+# A run that moves the pin force-pushes the one cldr-refresh branch, so runs
+# queue instead of overlapping.
+concurrency:
+  group: cldr-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh the CLDR data
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The push below authenticates with the App token; do not leave
+          # GITHUB_TOKEN in .git/config (zizmor: artipacked).
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          # No cache: this job's output is a pull request others merge, and a
+          # restored cache is a write path into it (zizmor: cache-poisoning).
+          cache: false
+
+      - name: Resolve the tags
+        id: tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_CLDR_TAG: ${{ inputs.cldr_tag }}
+        run: |
+          set -euo pipefail
+          pin() { sed -n "s/^\t$1 *= \"\(.*\)\"$/\1/p" internal/gen/cldr/cldr.go; }
+          pinned_cldr=$(pin Release)
+          pinned_json=$(pin JSONVersion)
+          cldr=${INPUT_CLDR_TAG:-$(gh api repos/unicode-org/cldr/releases/latest --jq .tag_name)}
+          # release-48 is cldr-json 48.0.x and release-48-2 is 48.2.x, whose
+          # patches repackage the same data, so the newest patch is taken.
+          if ! [[ "$cldr" =~ ^release-([0-9]+)(-([0-9]+))?$ ]]; then
+            echo "::error::unusable CLDR tag '${cldr}': want release-<major> or release-<major>-<minor>"
+            exit 1
+          fi
+          major=${BASH_REMATCH[1]}
+          minor=${BASH_REMATCH[3]:-0}
+          json=$(gh api 'repos/unicode-org/cldr-json/releases?per_page=100' \
+            --jq '.[] | select((.draft or .prerelease) | not) | .tag_name' |
+            { grep -E "^${major}\.${minor}\.[0-9]+$" || true; } | sort -V | tail -n 1)
+          # A red run, never a pull request mixing two releases: the pin
+          # moves only once cldr-json packages the CLDR release.
+          if [ -z "$json" ]; then
+            echo "::error::cldr-json has published no ${major}.${minor}.x release for CLDR ${cldr} yet; the pin stays at ${pinned_cldr}"
+            exit 1
+          fi
+          # The tags reach GITHUB_OUTPUT, a branch commit and the PR title;
+          # the pin command applies the same pattern before fetching.
+          for tag in "$pinned_cldr" "$pinned_json" "$json"; do
+            if ! [[ "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+              echo "::error::unusable tag '${tag}' (a pin not found, or a malformed release tag)"
+              exit 1
+            fi
+          done
+          changed=false
+          if [ "$cldr" != "$pinned_cldr" ] || [ "$json" != "$pinned_json" ]; then
+            changed=true
+          fi
+          {
+            echo "cldr=$cldr"
+            echo "json=$json"
+            echo "pinned_cldr=$pinned_cldr"
+            echo "pinned_json=$pinned_json"
+            echo "changed=$changed"
+          } >> "$GITHUB_OUTPUT"
+          echo "CLDR ${pinned_cldr} -> ${cldr}; cldr-json ${pinned_json} -> ${json}; changed=${changed}" >> "$GITHUB_STEP_SUMMARY"
+
+      # Before the pin moves: the report compares the pinned release with
+      # the new one.
+      - name: Report the script table's change
+        if: steps.tags.outputs.changed == 'true'
+        env:
+          CLDR_TAG: ${{ steps.tags.outputs.cldr }}
+        run: go run ./internal/gen/likely -diff "$CLDR_TAG" > "$RUNNER_TEMP/likely-diff.md"
+
+      - name: Move the pin
+        if: steps.tags.outputs.changed == 'true'
+        env:
+          CLDR_TAG: ${{ steps.tags.outputs.cldr }}
+          CLDR_JSON_TAG: ${{ steps.tags.outputs.json }}
+        run: go run ./internal/gen/pin -release "$CLDR_TAG" -json "$CLDR_JSON_TAG"
+
+      - name: Regenerate the tables
+        id: generate
+        if: steps.tags.outputs.changed == 'true'
+        run: go generate ./...
+
+      - name: Name the ISO 639-2 pin on a regeneration failure
+        if: failure() && steps.generate.outcome == 'failure'
+        run: |
+          {
+            echo "go generate failed. The names generator also fetches the ISO 639-2 file from www.loc.gov,"
+            echo "which is unversioned and keeps its own pin: a SHA-256 refusal naming ISO-639-2_utf-8.txt"
+            echo "means loc.gov edited that file, not a CLDR break; go run ./internal/gen/pin -iso moves it."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Regenerate the names golden
+        if: steps.tags.outputs.changed == 'true'
+        run: UPDATE_GOLDEN=1 go test -count=1 -run '^TestNamesGolden$' ./names
+
+      - name: Write the pull request body
+        if: steps.tags.outputs.changed == 'true'
+        env:
+          CLDR_TAG: ${{ steps.tags.outputs.cldr }}
+          CLDR_JSON_TAG: ${{ steps.tags.outputs.json }}
+          PINNED_CLDR: ${{ steps.tags.outputs.pinned_cldr }}
+          PINNED_JSON: ${{ steps.tags.outputs.pinned_json }}
+        run: |
+          set -euo pipefail
+          # Empty when no row of the script table changed.
+          report="$RUNNER_TEMP/likely-diff.md"
+          body="$RUNNER_TEMP/body.md"
+          {
+            echo "Moves the CLDR pin from \`${PINNED_CLDR}\` (cldr-json \`${PINNED_JSON}\`) to \`${CLDR_TAG}\` (cldr-json \`${CLDR_JSON_TAG}\`)."
+            echo
+            if [ -s "$report" ]; then
+              cat "$report"
+            else
+              echo "The script table keeps every row."
+            fi
+            echo
+            echo "The English names change, if any, is the diff of names/testdata/names.golden."
+            echo "If a row the hand copies in regions_test.go, scripttable_test.go or scripts_test.go hold moved, those tests fail until the copies are updated by hand to the reviewed rows, with the release and lines they cite."
+            echo "A script or region example, or a CLDR release or line citation, this makes false in README.md or docs/ is corrected in this pull request."
+          } > "$body"
+          # A pull request body holds at most 65,536 characters; the tables
+          # in the diff carry every row whatever is cut here.
+          if [ "$(wc -c < "$body")" -gt 60000 ]; then
+            head -c 60000 "$body" | sed '$d' > "$body.cut"
+            printf '\n\nThe report is cut here; scripttable.go in this diff lists every row.\n' >> "$body.cut"
+            mv "$body.cut" "$body"
+          fi
+
+      - name: Mint the App token
+        id: app-token
+        if: steps.tags.outputs.changed == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: cplieger
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Push the branch and open the pull request
+        if: steps.tags.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          CLDR_TAG: ${{ steps.tags.outputs.cldr }}
+          CLDR_JSON_TAG: ${{ steps.tags.outputs.json }}
+        run: |
+          set -euo pipefail
+          bot="${APP_SLUG}[bot]"
+          bot_id=$(gh api "users/${bot}" --jq .id)
+          git config user.name "$bot"
+          git config user.email "${bot_id}+${bot}@users.noreply.github.com"
+          title="feat: update the CLDR data to ${CLDR_TAG} (cldr-json ${CLDR_JSON_TAG})"
+          git switch -c cldr-refresh
+          git add -- internal/gen/cldr/cldr.go scripttable.go regiontable.go \
+            names/table.go names/testdata/names.golden
+          git commit -m "$title"
+          # The token goes to git through an extra header on this one push,
+          # never into .git/config.
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::${auth}"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth}" \
+            push --force origin HEAD:refs/heads/cldr-refresh
+          # REST, not gh pr: a scheduled job keeps off the GraphQL budget.
+          pulls="repos/${GITHUB_REPOSITORY}/pulls"
+          pr=$(gh api "${pulls}?head=${GITHUB_REPOSITORY_OWNER}:cldr-refresh&state=open" --jq '.[0].number // empty')
+          if [ -n "$pr" ]; then
+            gh api -X PATCH "${pulls}/${pr}" -f title="$title" -F body=@"$RUNNER_TEMP/body.md" --jq .html_url
+          else
+            gh api -X POST "$pulls" -f title="$title" -f head=cldr-refresh -f base=dev \
+              -F body=@"$RUNNER_TEMP/body.md" --jq .html_url
+          fi
+
+  # `needs:` must list every other job in this workflow.
+  notify:
+    needs: refresh
+    if: always()
+    # notify-failure reads the run's jobs, checks out cplieger/ci for its
+    # script and files or closes the tracker issue.
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    uses: cplieger/ci/.github/workflows/notify-failure.yaml@a7e8db7ef5ede0e783295a2225f171468712aa4a # v3
+    with:
+      workflow: ${{ github.workflow }}
+      run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

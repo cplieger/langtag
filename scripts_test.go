@@ -3,8 +3,51 @@ package langtag_test
 import (
 	"testing"
 
-	"github.com/cplieger/langtag/v2"
+	"github.com/cplieger/langtag/v3"
 )
+
+// TestResolvedScript pins the script an unstated-script tag resolves to
+// against CLDR 48's likely subtags, the rows x/text v0.43.0's older snapshot
+// answers differently (zh-MY Hant, ku-IQ Latn, ms-ID Arab, sd-IN Arab). Each
+// of those was an automatic script crossing: a bare ku target took a ku-IQ
+// file, which CLDR writes in Arabic, as the same script.
+func TestResolvedScript(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		// Region rows decide where CLDR has one.
+		"zh-TW":  "Hant",
+		"hak-TW": "Hant",
+		"ku-IQ":  "Arab",
+		"ku-AM":  "Cyrl",
+		"sd-IN":  "Deva",
+		// No row for the region: the language row decides.
+		"zh-MY":  "Hans",
+		"zh-419": "Hans",
+		"sr-RU":  "Cyrl",
+		"ms-ID":  "Latn",
+		// cmn has no row of its own; the macrolanguage zh answers.
+		"cmn-MY": "Hans",
+		// No rows of their own: the macrolanguage's region row decides.
+		"cmn-TW": "Hant",
+		"kmr-IQ": "Arab",
+		"zsm-CC": "Arab",
+		"uzn-AF": "Arab",
+		// CLDR 48 holds no row for either, so the script is unknown.
+		"cnr": "Zzzz",
+		"ber": "Zzzz",
+		// A stated script is never overridden by a row.
+		"zh-Hant-MY": "Hant",
+		"ku-Latn-IQ": "Latn",
+	}
+	for raw, want := range cases {
+		t.Run(raw, func(t *testing.T) {
+			t.Parallel()
+			if got := langtag.MustParse(raw).Script(); got != want {
+				t.Errorf("MustParse(%q).Script() = %q, want %q", raw, got, want)
+			}
+		})
+	}
+}
 
 // TestCloseScriptsPromoteOnlyWhatCLDRVouchesFor pins the one item moved
 // between tiers: CLDR scores a generic same-language cross-script
@@ -63,15 +106,16 @@ func TestCloseScriptsPromoteOnlyWhatCLDRVouchesFor(t *testing.T) {
 }
 
 // TestCloseScriptsStayWithinOneLanguage guards the obvious way a script
-// promotion could go wrong: it must never bridge two languages.
+// promotion could go wrong: it must never bridge two languages. The table is
+// emptied so that only the script rule could relate the pair.
 func TestCloseScriptsStayWithinOneLanguage(t *testing.T) {
 	t.Parallel()
 	// Croatian and Bosnian are Serbian's nearest neighbours in Latin script, so
 	// they are where a leak would show first.
-	sr := langtag.MustParse("sr-Latn")
+	sr := langtag.WithFallbacks(nil).Prefer(langtag.MustParse("sr-Latn"))
 	for _, other := range []string{"hr", "bs", "sl", "mk"} {
-		if got := langtag.Prefer(sr).Compare(langtag.MustParse(other)); got != langtag.TierNone {
-			t.Errorf("Prefer(sr-Latn).Compare(%q) = %v, want %v; a script promotion must not bridge languages",
+		if got := sr.Compare(langtag.MustParse(other)); got != langtag.TierNone {
+			t.Errorf("Prefer(sr-Latn).Compare(%q) with no fallbacks = %v, want %v; a script promotion must not bridge languages",
 				other, got, langtag.TierNone)
 		}
 	}
@@ -89,6 +133,11 @@ func TestCloseScriptsCarryProvenance(t *testing.T) {
 		}
 		if cs.A == cs.B {
 			t.Errorf("entry %+v names one script twice, so it cannot change any answer", cs)
+		}
+		// Tag.CoversScript drops its unknown-have test on this: a Zzzz row
+		// would let an unknown script cover a known one.
+		if cs.A == "Zzzz" || cs.B == "Zzzz" {
+			t.Errorf("entry %+v pairs the unknown script Zzzz, which matches nothing", cs)
 		}
 		if cs.Reason == "" || cs.Provenance == "" {
 			t.Errorf("entry %s %s/%s lacks a Reason or Provenance", cs.Language, cs.A, cs.B)
