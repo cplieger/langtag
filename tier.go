@@ -1,20 +1,13 @@
 package langtag
 
-// Tier is how far an available language sits from the one that was wanted. A
-// caller picks the highest tier it will accept as a floor.
+// Tier is how far an available language sits from the one that was wanted; a
+// caller picks the widest tier it accepts as a floor.
 //
-// The order is by KIND OF LICENSE, narrowest to widest — not a reading-
-// difficulty scale, and reading difficulty is not monotonic along it:
-// [TierOtherScript] covers the script pairs CLDR does not explicitly rate,
-// which it scores at 50, farther than any pair on the two tiers above.
-//
-// Tiers 0 through 2 follow from published standards data and hold no
-// opinion. The two tiers above are curated judgments, separated because they
-// make different claims: [TierIntelligible] says two languages are
-// interchangeable, [TierSharedLiteracy] says only that readers of one are,
-// as a population, literate in the other — a much weaker claim licensing
-// substitution to a different language entirely, so reaching it needs its
-// own opt-in.
+// The order ranks kinds of claim, narrowest to widest, not reading effort:
+// [TierOtherScript], CLDR's generic 50, is farther to read than the curated
+// pairs above it. Tiers 0 through 3 follow from standards data.
+// [TierIntelligible] and [TierSharedLiteracy] are curated, and the second
+// licenses a different language entirely, so it needs its own opt-in.
 type Tier uint8
 
 const (
@@ -25,42 +18,42 @@ const (
 
 	// TierSameLanguage means one language a reader takes in without effort. It
 	// covers macrolanguage folding (nob against nor, cmn against zho), regional
-	// variants (es-ES against es-419, pt-BR against pt-PT, en-GB against en-US),
-	// and the script pairs whose readers are taught both, which is Serbian
-	// Latin against Serbian Cyrillic (see [CloseScripts]).
+	// variants CLDR does not split (es-419 against es-MX, en-US against en-CA,
+	// fr-CA against fr-FR), the script pairs whose readers are taught both,
+	// which is Serbian Latin against Serbian Cyrillic (see [CloseScripts]), and
+	// an unknown script (Zzzz) against any other (cnr against cnr-Latn).
 	TierSameLanguage
+
+	// TierOtherRegion means one language in two regional standards: both tags
+	// state a region CLDR places, neither contains the other, and they sit on
+	// opposite sides of one of CLDR's paradigm clusters (es-419 against es-ES,
+	// pt-BR against pt-PT, en-US against en-GB, ar-MA against ar-EG, zh-Hant-HK
+	// against zh-Hant-TW). CLDR rates such a pair 5, against 4 or less for two
+	// regions on one side; a language with no cluster stays on [TierSameLanguage].
+	TierOtherRegion
 
 	// TierOtherScript means one language in a script its readers are NOT
 	// generally taught alongside: Simplified against Traditional Chinese,
 	// uz-Latn against uz-Cyrl. Readers of one usually manage the other, with
-	// effort. The pairs CLDR explicitly rates as close sit on the tier below
-	// instead, so what remains here is the set CLDR does not vouch for, which
-	// it scores at 50 against 4 to 20 for every curated close-language pair.
-	// That is why this tier can be a bigger ask than the two above it.
+	// effort. The pairs CLDR explicitly rates as close sit on
+	// [TierSameLanguage] instead, so what remains here is the set CLDR does not
+	// vouch for, which it scores at 50 against 4 to 30 for every curated
+	// close-language pair. That is why this tier can be a bigger ask than the
+	// two above it.
 	TierOtherScript
 
 	// TierIntelligible means two different languages that readers move between
-	// because the languages themselves are close: Bokmål and Nynorsk, Danish
-	// and Norwegian, Croatian and Bosnian, Czech and Slovak. The relationship
-	// runs both ways, which is the mark of interchangeability rather than of
-	// one population's schooling.
-	//
-	// These are written-language claims. Two languages readable to each other
-	// on the page are not necessarily comprehensible to each other aloud, and
-	// Danish against Norwegian is exactly that case. A caller matching audio
-	// should not reach this tier.
+	// because the languages are close: Bokmål and Nynorsk, Danish and
+	// Norwegian, Serbian and Croatian, Czech and Slovak, Malay and Indonesian.
+	// It runs both ways. These are written-language claims (Danish and
+	// Norwegian are far apart aloud), so a caller matching audio should not
+	// reach this tier.
 	TierIntelligible
 
-	// TierSharedLiteracy means a different, not necessarily related language
-	// that readers of the wanted one can use because they are broadly literate
-	// in it. Catalan readers read Spanish. The relationship runs one way only,
-	// and the two languages may be unrelated.
-	//
-	// This tier exists so the claim can be made honestly and separately rather
-	// than smuggled in beside interchangeability. It is never reached unless a
-	// caller asks for it by name, and the table ships one entry: extending it
-	// to the rest of the family is a decision for whoever runs the software,
-	// through [WithFallbacks].
+	// TierSharedLiteracy means a different, possibly unrelated language that
+	// readers of the wanted one are broadly literate in: Catalan readers read
+	// Spanish. It runs one way only and is reached only by a floor naming it;
+	// the built-in table holds one entry, and [WithFallbacks] adds more.
 	TierSharedLiteracy
 
 	// TierNone means no relationship worth acting on. It is also the answer
@@ -80,6 +73,7 @@ const (
 var tierNames = [...]string{
 	TierIdentical:      "identical",
 	TierSameLanguage:   "same-language",
+	TierOtherRegion:    "other-region",
 	TierOtherScript:    "other-script",
 	TierIntelligible:   nameIntelligible,
 	TierSharedLiteracy: nameSharedLiteracy,
@@ -105,6 +99,8 @@ func ParseTier(s string) (Tier, bool) {
 		return TierIdentical, true
 	case "same-language":
 		return TierSameLanguage, true
+	case "other-region":
+		return TierOtherRegion, true
 	case "other-script":
 		return TierOtherScript, true
 	case nameIntelligible:
@@ -116,16 +112,10 @@ func ParseTier(s string) (Tier, bool) {
 	}
 }
 
-// normalizeTierName lowercases and folds underscores to hyphens so the
-// configuration surface tolerates both spellings.
-//
-// The fold is ASCII byte arithmetic rather than strings.ToLower, matching the
-// tag parser's own ASCII-only gate. The tier names are ASCII by construction, so
-// a Unicode fold could only ever widen what is accepted — and it would widen it
-// onto exactly the impersonation shape the tag side refuses, since
-// strings.ToLower maps U+0130 onto "i" and strings.EqualFold matches U+017F
-// against "s". A Unicode spelling therefore fails closed here, which is the safe
-// direction: ParseTier's failure value is TierNone, a floor that matches nothing.
+// normalizeTierName lowercases ASCII, folds '_' to '-' and drops spaces and
+// tabs. The fold is ASCII-only, like the tag parser's gate: strings.ToLower
+// maps U+0130 onto "i" and strings.EqualFold matches U+017F against "s", so a
+// Unicode fold would accept impersonating spellings, which fail closed here.
 func normalizeTierName(s string) string {
 	out := make([]byte, 0, len(s))
 	for i := range len(s) {

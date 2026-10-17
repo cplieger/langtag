@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE supplementalData SYSTEM "../../common/dtd/ldmlSupplemental.dtd">
+<!-- A cut of CLDR likelySubtags.xml for the generator's tests. -->
+<supplementalData>
+    <version number="$Revision$"/>
+    <likelySubtags>
+		<likelySubtag from="ku" to="ku_Latn_TR"/>
+		<likelySubtag from="ku_AM" to="ku_Cyrl_AM"/>
+		<likelySubtag from="ku_IQ" to="ku_Arab_IQ"/>
+		<likelySubtag from="ku_Arab" to="ku_Arab_IQ"/>
+		<likelySubtag from="pt" to="pt_Latn_BR"/>
+		<likelySubtag from="pt_MO" to="pt_Hant_MO"/>
+		<likelySubtag from="zh" to="zh_Hans_CN"/>
+		<likelySubtag from="zh_TW" to="zh_Hant_TW"/>
+		<likelySubtag from="und" to="en_Latn_US"/>
+		<likelySubtag from="und_TW" to="zh_Hant_TW"/>
+    </likelySubtags>
+</supplementalData>

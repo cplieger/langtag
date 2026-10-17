@@ -3,7 +3,7 @@ package langtag_test
 import (
 	"fmt"
 
-	"github.com/cplieger/langtag/v2"
+	"github.com/cplieger/langtag/v3"
 )
 
 // One language spelled two ways is one language.
@@ -103,7 +103,7 @@ func ExamplePreference_Reason() {
 }
 
 // A deployment that disagrees with a shipped judgment replaces the table
-// instead of forking the package. Passing nil disables tier 3 outright.
+// instead of forking the package. Passing nil disables both cross-language tiers.
 func ExampleWithFallbacks() {
 	strict := langtag.WithFallbacks(nil)
 	nb, nn := langtag.MustParse("nb"), langtag.MustParse("nn")

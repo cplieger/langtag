@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cplieger/langtag/v2"
+	"github.com/cplieger/langtag/v3"
 )
 
 func TestParse(t *testing.T) {
@@ -180,33 +180,35 @@ func TestMustParsePanicsOnBadInput(t *testing.T) {
 	_ = langtag.MustParse("pob")
 }
 
-// FuzzParse guards the untrusted-input boundary: language identifiers reach
-// this package from Plex metadata, ffprobe output and third-party APIs. The
-// non-ASCII seeds are one per class of Unicode 15 -> 17 change (documented in
-// unicode_test.go), seeded here so the round-trip and tier invariants below
-// also run against them.
-func FuzzParse(f *testing.F) {
-	for _, seed := range []string{
-		"", " ", "en", "ENG", "nob", "nor", "und", "zxx", "mul", "mis", "qaa",
-		"pt-BR", "zh-Hant-HK", "es-419", "sr-Latn-RS", "x-private",
-		"i-klingon", "art-lojban", "en-US-u-va-posix", "\x00", "\xff\xfe",
-		"------", strings.Repeat("en-", 40), "en-" + strings.Repeat("a", 100),
+// parseSeeds are FuzzParse's durable corpus, shared with the property tests.
+// The non-ASCII seeds are one per class of Unicode 15 -> 17 change
+// (documented in unicode_test.go).
+var parseSeeds = []string{
+	"", " ", "en", "ENG", "nob", "nor", "und", "zxx", "mul", "mis", "qaa",
+	"pt-BR", "zh-Hant-HK", "es-419", "sr-Latn-RS", "x-private",
+	"i-klingon", "art-lojban", "en-US-u-va-posix", "\x00", "\xff\xfe",
+	"------", strings.Repeat("en-", 40), "en-" + strings.Repeat("a", 100),
 
-		// Newly folding in Unicode 17, both members pre-existing: the only class
-		// that changes strings.EqualFold for input a corpus can already hold.
-		"\u0390n", "\u1FD3n", "\u03B0n", "\u1FE3n", "\uFB05k", "\uFB06k",
-		// Category flips. U+0295 left Ll for Lo while already assigned, so
-		// unicode.IsLower flips true -> false for real text; U+1171E left Mn
-		// for Mc, the one change running the other way.
-		"e\u0295", "en-\u1171Eatn",
-		// Non-ASCII runes that a Unicode fold or lowercase maps onto ASCII, so
-		// they impersonate a real subtag. Complete set for ASCII targets.
-		"\u017Fk", "i\u017F", "\u212Ak", "\u0130d",
-		// Gained a ToUpper mapping in Unicode 17 while already assigned.
-		"e\u019B",
-		// Newly assigned letter: unicode.IsLetter false on 15, true on 17.
-		"\u105C0n",
-	} {
+	// Newly folding in Unicode 17, both members pre-existing: the only class
+	// that changes strings.EqualFold for input a corpus can already hold.
+	"\u0390n", "\u1FD3n", "\u03B0n", "\u1FE3n", "\uFB05k", "\uFB06k",
+	// Category flips. U+0295 left Ll for Lo while already assigned, so
+	// unicode.IsLower flips true -> false for real text; U+1171E left Mn
+	// for Mc, the one change running the other way.
+	"e\u0295", "en-\u1171Eatn",
+	// Non-ASCII runes that a Unicode fold or lowercase maps onto ASCII, so
+	// they impersonate a real subtag. Complete set for ASCII targets.
+	"\u017Fk", "i\u017F", "\u212Ak", "\u0130d",
+	// Gained a ToUpper mapping in Unicode 17 while already assigned.
+	"e\u019B",
+	// Newly assigned letter: unicode.IsLetter false on 15, true on 17.
+	"\u105C0n",
+}
+
+// FuzzParse guards the untrusted-input boundary: language identifiers reach
+// this package from Plex metadata, ffprobe output and third-party APIs.
+func FuzzParse(f *testing.F) {
+	for _, seed := range parseSeeds {
 		f.Add(seed)
 	}
 	f.Fuzz(func(t *testing.T, raw string) {
@@ -247,7 +249,17 @@ func FuzzParse(f *testing.F) {
 		// consumer's own comparison to the Unicode fold tables this package
 		// deliberately never consults. Asserted here as a property so it holds
 		// for generated input, not only for the seeds above.
-		for _, out := range []string{got.String(), got.Language(), got.Script()} {
+		// A stated script is the resolved one: no table row overrides it.
+		if stated := got.StatedScript(); stated != "" && got.Script() != stated {
+			t.Fatalf("Parse(%q): Script() = %q, StatedScript() = %q, want them equal when a script is stated",
+				raw, got.Script(), stated)
+		}
+		// MultiScript keys on the subtag or the macrolanguage, so a variety
+		// of a multi-script macrolanguage is multi-script too.
+		if base, ok := langtag.Parse(got.Language()); ok && base.MultiScript() && !got.MultiScript() {
+			t.Fatalf("Parse(%q).MultiScript() = false, want true: its language %q is multi-script", raw, got.Language())
+		}
+		for _, out := range []string{got.String(), got.Language(), got.Script(), got.StatedScript(), got.Region()} {
 			for i := range len(out) {
 				if out[i] >= 0x80 {
 					t.Fatalf("Parse(%+q) produced %+q, which carries a non-ASCII byte at %d", raw, out, i)
@@ -255,4 +267,65 @@ func FuzzParse(f *testing.F) {
 			}
 		}
 	})
+}
+
+// parseCorpus adds to parseSeeds the stated-subtag shapes Parse canonicalizes:
+// script only, region only, both, numeric regions and legacy forms that
+// gain a script (sh) or a region (mo).
+var parseCorpus = []string{
+	"zh", "zh-Hans", "zh-Hant", "zh-TW", "zh-Hant-TW", "zh-419", "cmn-MY",
+	"sr", "sr-Cyrl", "sr-ME", "sh", "mo", "ku-IQ", "ku-Latn-IQ", "kmr",
+	"pt", "pt-PT", "pt-Latn-PT", "es-419", "en-001", "en-Zzzz", "en-ZZ",
+	"nb", "no", "nn", "yue-Hans", "cnr", "cnr-ME", "ber",
+}
+
+// TestStatedSubtagsCanonical pins that StatedScript and Region read the
+// canonical form, so they are "" exactly when String() states no such
+// subtag, and that == stays canonical equality with the new fields.
+func TestStatedSubtagsCanonical(t *testing.T) {
+	t.Parallel()
+	tags := make([]langtag.Tag, 0, len(parseCorpus)+len(parseSeeds))
+	check := func(raw string, tag langtag.Tag) {
+		tags = append(tags, tag)
+		script, region := statedSubtags(tag.String())
+		if got := tag.StatedScript(); got != script {
+			t.Errorf("Parse(%q).StatedScript() = %q, want %q from %q", raw, got, script, tag.String())
+		}
+		if got := tag.Region(); got != region {
+			t.Errorf("Parse(%q).Region() = %q, want %q from %q", raw, got, region, tag.String())
+		}
+	}
+	for _, raw := range parseCorpus {
+		tag, ok := langtag.Parse(raw)
+		if !ok {
+			t.Errorf("Parse(%q) rejected a corpus entry, want it accepted", raw)
+			continue
+		}
+		check(raw, tag)
+	}
+	// Seeds include inputs Parse rejects; only the accepted ones are checked.
+	for _, raw := range parseSeeds {
+		if tag, ok := langtag.Parse(raw); ok {
+			check(raw, tag)
+		}
+	}
+	for _, a := range tags {
+		for _, b := range tags {
+			if (a == b) != (a.String() == b.String()) {
+				t.Errorf("(%q == %q) = %v, want canonical equality", a, b, a == b)
+			}
+		}
+	}
+}
+
+// statedSubtags splits a canonical lang[-Script][-Region] form.
+func statedSubtags(canon string) (script, region string) {
+	parts := strings.Split(canon, "-")[1:]
+	if len(parts) > 0 && len(parts[0]) == 4 {
+		script, parts = parts[0], parts[1:]
+	}
+	if len(parts) > 0 {
+		region = parts[0]
+	}
+	return script, region
 }

@@ -3,7 +3,7 @@ package langtag_test
 import (
 	"testing"
 
-	"github.com/cplieger/langtag/v2"
+	"github.com/cplieger/langtag/v3"
 )
 
 // TestIntelligibleFloorAdmitsNoSharedLiteracy pins that a shared-literacy claim
@@ -246,7 +246,7 @@ func TestKindTier(t *testing.T) {
 }
 
 // TestExcludedFamilyStaysOutAtEveryFloor extends the shared-literacy exclusion
-// to the loosest floor a caller can set. The 33 pairs in
+// to the loosest floor a caller can set. The 32 pairs in
 // TestCompareExcludesSharedLiteracy are absent from the table, so no opt-in can
 // reach them; this asserts that rather than assuming it.
 func TestExcludedFamilyStaysOutAtEveryFloor(t *testing.T) {
@@ -265,12 +265,10 @@ func TestExcludedFamilyStaysOutAtEveryFloor(t *testing.T) {
 		{"af", "nl"},
 		{"mk", "bg"},
 		{"et", "fi"},
-		{"ms", "id"},
-		{"sr", "hr"},
 	}
 	for _, floor := range []langtag.Tier{
-		langtag.TierIdentical, langtag.TierSameLanguage, langtag.TierOtherScript,
-		langtag.TierIntelligible, langtag.TierSharedLiteracy,
+		langtag.TierIdentical, langtag.TierSameLanguage, langtag.TierOtherRegion,
+		langtag.TierOtherScript, langtag.TierIntelligible, langtag.TierSharedLiteracy,
 	} {
 		for _, p := range pairs {
 			a, b := langtag.MustParse(p[0]), langtag.MustParse(p[1])
