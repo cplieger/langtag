@@ -318,6 +318,43 @@ func TestStatedSubtagsCanonical(t *testing.T) {
 	}
 }
 
+// TestParseRegion pins Region and the canonical form per region shape, and
+// that a variant or extension after the region is dropped rather than read as
+// the region (Tag.regionAt owns why).
+func TestParseRegion(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		raw    string
+		canon  string
+		region string
+	}{
+		"numeric region":                  {"es-419", "es-419", "419"},
+		"alpha region":                    {"pt-BR", "pt-BR", "BR"},
+		"script and alpha region":         {"zh-Hant-TW", "zh-Hant-TW", "TW"},
+		"latin serbian in serbia":         {"sr-Latn-RS", "sr-Latn-RS", "RS"},
+		"no region":                       {"sr-Latn", "sr-Latn", ""},
+		"variant after region":            {"ca-ES-valencia", "ca-ES", "ES"},
+		"extension after numeric":         {"es-419-u-nu-latn", "es-419", "419"},
+		"private use after region":        {"en-US-x-twain", "en-US", "US"},
+		"variant after script and region": {"sr-Latn-RS-ekavsk", "sr-Latn-RS", "RS"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := langtag.Parse(tc.raw)
+			if !ok {
+				t.Fatalf("Parse(%q) returned ok=false, want a valid tag", tc.raw)
+			}
+			if got.String() != tc.canon {
+				t.Errorf("Parse(%q).String() = %q, want %q", tc.raw, got.String(), tc.canon)
+			}
+			if got.Region() != tc.region {
+				t.Errorf("Parse(%q).Region() = %q, want %q", tc.raw, got.Region(), tc.region)
+			}
+		})
+	}
+}
+
 // statedSubtags splits a canonical lang[-Script][-Region] form.
 func statedSubtags(canon string) (script, region string) {
 	parts := strings.Split(canon, "-")[1:]
