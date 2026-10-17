@@ -1,6 +1,6 @@
 # The cross-language table
 
-This page lists the five relationships between different languages that langtag ships. It shows how to replace them and how to propose a new one, for a developer who wants to change what the curated tiers accept.
+This page lists the eight relationships between different languages that langtag ships. It shows how to replace them and how to propose a new one, for a developer who wants to change what the curated tiers accept.
 
 ## The shipped entries
 
@@ -11,14 +11,17 @@ Each entry is a claim about people, and each one is arguable. `Fallbacks` return
 | `no` | `nn` | intelligible | yes | Bokmål and Nynorsk are the two written standards of Norwegian. Norwegian schooling teaches both |
 | `no` | `da` | intelligible | yes | Written Bokmål derives from Danish and the two remain close on the page |
 | `hr` | `bs` | intelligible | yes | Croatian and Bosnian are mutually intelligible and share the Latin script |
+| `sr` | `hr` | intelligible | yes | Serbian and Croatian are mutually intelligible, and Serbian schooling teaches the Latin script Croatian is written in |
+| `sr` | `bs` | intelligible | yes | Serbian and Bosnian are mutually intelligible, and Serbian schooling teaches the Latin script Bosnian is written in |
 | `cs` | `sk` | intelligible | yes | Czech and Slovak are mutually intelligible in writing |
+| `ms` | `id` | intelligible | yes | Malay and Indonesian are standards of one language, written in the same Latin alphabet and spelling since 1972 |
 | `ca` | `es` | shared-literacy | no | Catalonia is officially bilingual and Spanish is compulsory in schooling |
 
 Entries name languages the way `Tag.Language` reports them, so one entry covers every spelling. A wanted language of `no` answers for `nor`, `nob`, `no` and `nb` alike.
 
 The `Kind` decides the tier, and it must agree with the direction. An `Intelligible` entry runs both ways, because that is what the claim means. A `SharedLiteracy` entry runs one way, because a majority-language population does not read the minority language back. `WithFallbacks` enforces both rules on every table, and a test checks the shipped one.
 
-Every entry carries a `Provenance` field naming where the claim can be checked again. For all five it is the [`languageInfo.xml`](https://github.com/unicode-org/cldr/blob/main/common/supplemental/languageInfo.xml) file of [CLDR](https://cldr.unicode.org), the Unicode Consortium's shared locale data.
+Every entry carries a `Provenance` field naming where the claim can be checked again. For all eight it is the [`languageInfo.xml`](https://github.com/unicode-org/cldr/blob/main/common/supplemental/languageInfo.xml) file of [CLDR](https://cldr.unicode.org), the Unicode Consortium's shared locale data. CLDR rates Serbo-Croatian (`sh`) 4 from Croatian, Bosnian and Serbian, but folds `sh` onto `sr-Latn` and leaves its own Serbian rows commented out, so the two Serbian entries are langtag's reading of the `sh` rows rather than CLDR's. CLDR rates Malay and Indonesian in both directions, 30 one way and 10 the other, and ISO 639-3 places Indonesian inside the Malay macrolanguage.
 
 ## Replacing the table
 
@@ -32,10 +35,10 @@ When two entries claim one ordered pair at different tiers, the farther tier win
 
 `golang.org/x/text` embeds CLDR version 32, which disagrees with current CLDR. Its matcher does not know `cs` and `sk` or `ca` and `es`. It still carries a `mk` to `bg` relationship that CLDR has since retired. To check whether CLDR carries a relationship, its direction and its distance, read `languageInfo.xml` itself, never the `x/text` matcher.
 
-langtag does not use the `x/text` Matcher. It uses `x/text` to parse and canonicalize tags, and to infer a default script when a tag states none. That default comes from the same CLDR 32 snapshot.
+langtag does not use the `x/text` Matcher. It uses `x/text` only to parse and canonicalize tags. The default script for a tag that states none comes from a pinned CLDR release instead, as [Data sources](data-sources.md) describes.
 
 ## Proposing an entry
 
 A missing entry leaves a track alone, which is what a caller had before adopting langtag. A wrong entry silently switches a library's tracks to a language nobody asked for. The two failures are not equal, so the table grows on request rather than on inference.
 
-Open an issue that names the two languages, the direction, whether it holds both ways, and why a reader of the first can use the second. Two things rule a proposal out. Anything that follows from [macrolanguage folding](parsing.md#canonicalization), script or region is already covered by the first three tiers and needs no entry. A one-way claim is shared literacy, whatever its distance. It goes on `TierSharedLiteracy` and needs that tier's opt-in.
+Open an issue that names the two languages, the direction, whether it holds both ways, and why a reader of the first can use the second. Two things rule a proposal out. Anything that follows from [macrolanguage folding](parsing.md#canonicalization), script or region is already covered by the first four tiers and needs no entry. A one-way claim is shared literacy, whatever its distance. It goes on `TierSharedLiteracy` and needs that tier's opt-in.

@@ -3,29 +3,17 @@ package langtag_test
 import (
 	"testing"
 
-	"github.com/cplieger/langtag/v2"
+	"github.com/cplieger/langtag/v3"
 )
 
-// This file exists because Parse delegates grammar, canonicalization and
-// default-script resolution to golang.org/x/text (see tag.go), so a
-// dependency bump can move this number without a line of langtag changing —
-// a regression a diff cannot show. Both consumers (plex-language-sync,
-// subflux) parse once per available track per episode, so the per-call cost
-// multiplies by a media library's worth of tracks.
-//
-// The three Test functions gate allocation counts that were measured to hold
-// before being asserted; BenchmarkParse feeds the tracker one series per
-// input class, because the classes diverge inside x/text and a regression
-// confined to one would be invisible in an average.
-//
-// Measured on go1.27.0 with x/text v0.41.0: Parse allocates 3-5 times for an
-// accepted tag, once for an unparseable one, and never for a blank one.
-// There is no already-canonical fast path — "de" and "ger" both run the full
-// pipeline and differ only by what canonicalization costs.
-//
-// Neither contract calls t.Parallel: testing.AllocsPerRun pins GOMAXPROCS to
-// 1 for its measurement window, so a concurrent sibling's allocations would
-// be misattributed.
+// This file gates Parse's allocations and feeds BenchmarkParse because Parse
+// delegates grammar and canonicalization to golang.org/x/text (tag.go): a
+// dependency bump can move the cost with no langtag diff, and both consumers
+// parse once per track per episode. The contract: accessors and a blank input
+// never allocate, and Valid costs no more than Parse. None of these tests
+// calls t.Parallel: testing.AllocsPerRun panics while a parallel test runs
+// (Go 1.25), since the process-wide malloc count would include the sibling's:
+// https://go.dev/doc/go1.25#testing.
 
 // parseSink* consume every result these benchmarks and contracts produce.
 // b.Loop keeps the call itself from being elided, but a return value nothing
@@ -50,10 +38,13 @@ func TestTagAccessorsAreAllocationFree(t *testing.T) {
 	for name, tag := range tags {
 		t.Run(name, func(t *testing.T) {
 			accessors := map[string]func(){
-				"String":   func() { parseSinkString = tag.String() },
-				"Language": func() { parseSinkString = tag.Language() },
-				"Script":   func() { parseSinkString = tag.Script() },
-				"IsZero":   func() { parseSinkBool = tag.IsZero() },
+				"String":       func() { parseSinkString = tag.String() },
+				"Language":     func() { parseSinkString = tag.Language() },
+				"Script":       func() { parseSinkString = tag.Script() },
+				"StatedScript": func() { parseSinkString = tag.StatedScript() },
+				"Region":       func() { parseSinkString = tag.Region() },
+				"MultiScript":  func() { parseSinkBool = tag.MultiScript() },
+				"IsZero":       func() { parseSinkBool = tag.IsZero() },
 			}
 			for method, call := range accessors {
 				if got := testing.AllocsPerRun(100, call); got != 0 {
@@ -103,19 +94,12 @@ func TestValidCostsNoMoreThanParse(t *testing.T) {
 	}
 }
 
-// BenchmarkParse measures each input class that takes a different path
-// through golang.org/x/text; called once per available track per episode, so
-// the number multiplies by every track in a media library.
-//
-//   - plain_alpha2 and canonicalized_alpha3 both produce "de": the gap
-//     between them is canonicalization's cost, and there is no
-//     already-canonical fast path today.
-//   - script_and_region exercises the widest tag shape (three subtags).
-//   - grandfathered exercises the registry's irregular-tag lookup table.
-//   - already_canonical_full needs no rewriting; only the pipeline's fixed
-//     cost remains.
-//   - unparseable and empty are the reject paths; empty is guarded so a
-//     reordered short-circuit shows as this series tripling.
+// BenchmarkParse charts one series per input class, because the classes take
+// different paths through golang.org/x/text and a regression confined to one
+// would vanish in an average. plain_alpha2 and canonicalized_alpha3 both
+// produce "de", so their gap is canonicalization's cost; empty is the
+// guarded reject path, so a reordered short-circuit shows as that series
+// tripling.
 func BenchmarkParse(b *testing.B) {
 	// Built as a literal, deliberately: the weekly tracker runs with -run='^$',
 	// so no Test function executes first and a benchmark that leaned on

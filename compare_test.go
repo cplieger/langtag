@@ -3,7 +3,7 @@ package langtag_test
 import (
 	"testing"
 
-	"github.com/cplieger/langtag/v2"
+	"github.com/cplieger/langtag/v3"
 )
 
 func TestCompare(t *testing.T) {
@@ -28,23 +28,27 @@ func TestCompare(t *testing.T) {
 		"msa wants arabic":       {"arb", "ar", langtag.TierSameLanguage},
 		"swahili":                {"swh", "sw", langtag.TierSameLanguage},
 
-		// Tier 1, region only. Reading is unaffected by a region subtag.
-		"european vs latin american spanish": {"es-ES", "es-419", langtag.TierSameLanguage},
-		"brazilian vs european portuguese":   {"pt-BR", "pt-PT", langtag.TierSameLanguage},
-		"british vs american english":        {"en-GB", "en-US", langtag.TierSameLanguage},
-		"bare vs regional danish":            {"da", "da-DK", langtag.TierSameLanguage},
-		"bare chinese vs simplified":         {"zh", "zh-Hans", langtag.TierSameLanguage},
-		"bare serbian vs cyrillic":           {"sr", "sr-Cyrl", langtag.TierSameLanguage},
-		"serbian scripts read as one":        {"sr-Cyrl", "sr-Latn", langtag.TierSameLanguage},
-		"serbian scripts, other direction":   {"sr-Latn", "sr-Cyrl", langtag.TierSameLanguage},
+		// Tier 1, region only, never across a CLDR cluster.
+		"mexican vs latin american spanish": {"es-MX", "es-419", langtag.TierSameLanguage},
+		"american vs canadian english":      {"en-US", "en-CA", langtag.TierSameLanguage},
+		"bare vs regional danish":           {"da", "da-DK", langtag.TierSameLanguage},
+		"bare chinese vs simplified":        {"zh", "zh-Hans", langtag.TierSameLanguage},
+		"bare serbian vs cyrillic":          {"sr", "sr-Cyrl", langtag.TierSameLanguage},
+		"serbian scripts read as one":       {"sr-Cyrl", "sr-Latn", langtag.TierSameLanguage},
+		"serbian scripts, other direction":  {"sr-Latn", "sr-Cyrl", langtag.TierSameLanguage},
 
-		// Tier 2: one language, different script.
+		// Tier 2: one language, two regional standards (TestOtherRegion).
+		"european vs latin american spanish": {"es-ES", "es-419", langtag.TierOtherRegion},
+		"brazilian vs european portuguese":   {"pt-BR", "pt-PT", langtag.TierOtherRegion},
+		"british vs american english":        {"en-GB", "en-US", langtag.TierOtherRegion},
+
+		// Tier 3: one language, different script.
 		"simplified vs traditional chinese":          {"zh-Hans", "zh-Hant", langtag.TierOtherScript},
 		"traditional vs simplified chinese":          {"zh-Hant", "zh-Hans", langtag.TierOtherScript},
 		"uzbek scripts":                              {"uz-Latn", "uz-Cyrl", langtag.TierOtherScript},
 		"mandarin traditional vs chinese simplified": {"cmn-Hant", "zh-Hans", langtag.TierOtherScript},
 
-		// Tier 3: a different language, from the curated table.
+		// Tier 4: a different language, from the curated table.
 		"bokmal wants nynorsk":    {"nb", "nn", langtag.TierIntelligible},
 		"nynorsk wants bokmal":    {"nn", "nb", langtag.TierIntelligible},
 		"norwegian wants nynorsk": {"nor", "nno", langtag.TierIntelligible},
@@ -54,16 +58,17 @@ func TestCompare(t *testing.T) {
 		"bosnian wants croatian":  {"bs", "hr", langtag.TierIntelligible},
 		"czech wants slovak":      {"cs", "sk", langtag.TierIntelligible},
 		"slovak wants czech":      {"sk", "cs", langtag.TierIntelligible},
+		"serbian wants croatian":  {"sr", "hr", langtag.TierIntelligible},
+		"malay wants indonesian":  {"ms", "id", langtag.TierIntelligible},
 
-		// Tier 4: a different language reachable only because readers of the
+		// Tier 5: a different language reachable only because readers of the
 		// first are broadly literate in the second. One direction only.
 		"catalan wants spanish": {"ca", "es", langtag.TierSharedLiteracy},
 
-		// Tier 5: unrelated, or related in ways this package refuses to act on.
+		// Tier 6: unrelated, or related in ways this package refuses to act on.
 		"norwegian wants swedish":        {"no", "sv", langtag.TierNone},
 		"danish wants swedish":           {"da", "sv", langtag.TierNone},
 		"spanish wants catalan":          {"es", "ca", langtag.TierNone},
-		"serbian wants croatian":         {"sr", "hr", langtag.TierNone},
 		"hindi wants urdu":               {"hi", "ur", langtag.TierNone},
 		"polish wants czech":             {"pl", "cs", langtag.TierNone},
 		"galician wants spanish":         {"gl", "es", langtag.TierNone},
@@ -83,11 +88,134 @@ func TestCompare(t *testing.T) {
 	}
 }
 
+// TestOtherRegion pins the region tier to CLDR's paradigm clusters: two
+// stated regions of one language grade other-region only across a cluster's
+// edge, never inside one, never when one region contains the other, and never
+// in place of a script difference.
+func TestOtherRegion(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		want, have string
+		tier       langtag.Tier
+	}{
+		"latin american vs european spanish":    {"es-419", "es-ES", langtag.TierOtherRegion},
+		"brazilian vs european portuguese":      {"pt-BR", "pt-PT", langtag.TierOtherRegion},
+		"american vs british english":           {"en-US", "en-GB", langtag.TierOtherRegion},
+		"moroccan vs egyptian arabic":           {"ar-MA", "ar-EG", langtag.TierOtherRegion},
+		"hong kong vs taiwan traditional":       {"zh-Hant-HK", "zh-Hant-TW", langtag.TierOtherRegion},
+		"stated script on one side only":        {"pt-BR", "pt-Latn-PT", langtag.TierOtherRegion},
+		"resolved traditional script":           {"zh-HK", "zh-TW", langtag.TierOtherRegion},
+		"macrolanguage member across clusters":  {"arb-MA", "ar-EG", langtag.TierOtherRegion},
+		"latin america contains mexico":         {"es-419", "es-MX", langtag.TierSameLanguage},
+		"both inside the us cluster":            {"en-US", "en-CA", langtag.TierSameLanguage},
+		"both outside the americas":             {"pt-PT", "pt-AO", langtag.TierSameLanguage},
+		"french has no cluster":                 {"fr-CA", "fr-FR", langtag.TierSameLanguage},
+		"simplified has no cluster":             {"zh-Hans-HK", "zh-Hans-TW", langtag.TierSameLanguage},
+		"world contains every region":           {"en-001", "en-US", langtag.TierSameLanguage},
+		"northern america contains the us":      {"en-021", "en-US", langtag.TierSameLanguage},
+		"northern africa contains morocco":      {"ar-015", "ar-MA", langtag.TierSameLanguage},
+		"world contains mexico":                 {"es-001", "es-MX", langtag.TierSameLanguage},
+		"caribbean straddles, counts outside":   {"en-029", "en-GB", langtag.TierSameLanguage},
+		"caribbean straddles, against the us":   {"en-029", "en-US", langtag.TierOtherRegion},
+		"northern africa straddles the maghreb": {"ar-015", "ar-SA", langtag.TierSameLanguage},
+		"outlying oceania lost the us islands":  {"en-QO", "en-UM", langtag.TierOtherRegion},
+		"outlying oceania lost bouvet":          {"es-QO", "es-BV", langtag.TierOtherRegion},
+		"outlying oceania lost south georgia":   {"pt-QO", "pt-GS", langtag.TierOtherRegion},
+		"oceania lost bouvet":                   {"es-009", "es-BV", langtag.TierOtherRegion},
+		"micronesia contains the us islands":    {"en-057", "en-UM", langtag.TierSameLanguage},
+		"united nations contains the us":        {"en-UN", "en-US", langtag.TierSameLanguage},
+		"one region unstated":                   {"pt", "pt-BR", langtag.TierSameLanguage},
+		"unknown region is unstated":            {"es-ZZ", "es-MX", langtag.TierSameLanguage},
+		"private-use region is unstated":        {"es-XA", "es-MX", langtag.TierSameLanguage},
+		"private-use aa is unstated":            {"en-AA", "en-US", langtag.TierSameLanguage},
+		"private-use qm is unstated":            {"pt-QM", "pt-BR", langtag.TierSameLanguage},
+		"kosovo is a placed region":             {"en-XK", "en-US", langtag.TierOtherRegion},
+		"script difference wins":                {"zh-Hant-HK", "zh-Hans-TW", langtag.TierOtherScript},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			want, have := langtag.MustParse(tc.want), langtag.MustParse(tc.have)
+			if got := langtag.Prefer(want).Compare(have); got != tc.tier {
+				t.Errorf("Prefer(%q).Compare(%q) = %v, want %v", tc.want, tc.have, got, tc.tier)
+			}
+			if got := langtag.Prefer(have).Compare(want); got != tc.tier {
+				t.Errorf("Prefer(%q).Compare(%q) = %v, want %v", tc.have, tc.want, got, tc.tier)
+			}
+		})
+	}
+}
+
+// TestNewIntelligiblePairs pins Serbian with Croatian and with Bosnian (langtag's reading of CLDR's sh rows, since CLDR
+// aliases sh to sr-Latn and comments out its own sr rows), and Malay with
+// Indonesian. Each holds both ways, for every spelling and script of the
+// language.
+func TestNewIntelligiblePairs(t *testing.T) {
+	t.Parallel()
+	pairs := map[string][2]string{
+		"serbian and croatian":            {"sr", "hr"},
+		"serbian and bosnian":             {"sr", "bs"},
+		"malay and indonesian":            {"ms", "id"},
+		"cyrillic serbian and croatian":   {"sr-Cyrl", "hr"},
+		"serbo-croatian and bosnian":      {"sh", "bs"},
+		"standard malay and indonesian":   {"zsm", "ind"},
+		"malaysian malay and indonesian":  {"ms-MY", "id-ID"},
+		"montenegrin serbian and bosnian": {"sr-Latn-ME", "bs-BA"},
+	}
+	for name, p := range pairs {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			a, b := langtag.MustParse(p[0]), langtag.MustParse(p[1])
+			for _, d := range [][2]langtag.Tag{{a, b}, {b, a}} {
+				if got := langtag.Prefer(d[0]).Compare(d[1]); got != langtag.TierIntelligible {
+					t.Errorf("Prefer(%v).Compare(%v) = %v, want %v", d[0], d[1], got, langtag.TierIntelligible)
+				}
+				if r, ok := langtag.Prefer(d[0]).Reason(d[1]); !ok || r == "" {
+					t.Errorf("Prefer(%v).Reason(%v) = %q, %v, want a recorded reason", d[0], d[1], r, ok)
+				}
+			}
+		})
+	}
+}
+
+// TestUnknownScriptIsNoTierDifference pins that a tag whose script is unknown
+// (Zzzz, stated or resolved because CLDR gives the language none) grades as
+// the same script as any other tag of its language, so only the region can
+// separate them. The zh row reaches the cluster check with a Traditional
+// script on one side only, and the cluster counts only Traditional tags.
+func TestUnknownScriptIsNoTierDifference(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		want, have string
+		tier       langtag.Tier
+	}{
+		"montenegrin against latin":       {"cnr", "cnr-Latn", langtag.TierSameLanguage},
+		"montenegrin against cyrillic":    {"cnr", "cnr-Cyrl", langtag.TierSameLanguage},
+		"berber against tifinagh":         {"ber", "ber-Tfng", langtag.TierSameLanguage},
+		"stated unknown against stated":   {"zh-Zzzz", "zh-Hant", langtag.TierSameLanguage},
+		"traditional cluster, one side":   {"zh-Hant-HK", "zh-Zzzz-TW", langtag.TierSameLanguage},
+		"unknown script keeps the region": {"en-Zzzz-US", "en-GB", langtag.TierOtherRegion},
+		"known scripts still differ":      {"cnr-Latn", "cnr-Cyrl", langtag.TierOtherScript},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			want, have := langtag.MustParse(tc.want), langtag.MustParse(tc.have)
+			if got := langtag.Prefer(want).Compare(have); got != tc.tier {
+				t.Errorf("Prefer(%q).Compare(%q) = %v, want %v", tc.want, tc.have, got, tc.tier)
+			}
+			if got := langtag.Prefer(have).Compare(want); got != tc.tier {
+				t.Errorf("Prefer(%q).Compare(%q) = %v, want %v", tc.have, tc.want, got, tc.tier)
+			}
+		})
+	}
+}
+
 // TestCompareExcludesSharedLiteracy is the load-bearing regression guard: CLDR
 // rates every pair below as close because the first language's population is
 // broadly literate in the second, which is accurate sociolinguistics and an
 // unacceptable substitution rule — a viewer who chose Tamil subtitles did not
-// ask for English ones. Tiers 0-2 cannot express a cross-language relation at
+// ask for English ones. Tiers 0-3 cannot express a cross-language relation at
 // all, so this excludes the whole family by construction.
 func TestCompareExcludesSharedLiteracy(t *testing.T) {
 	t.Parallel()
@@ -124,7 +252,6 @@ func TestCompareExcludesSharedLiteracy(t *testing.T) {
 		"cebuano and tagalog":      {"ceb", "tl"},
 		"macedonian and bulgarian": {"mk", "bg"},
 		"estonian and finnish":     {"et", "fi"},
-		"malay and indonesian":     {"ms", "id"},
 	}
 	for name, p := range pairs {
 		t.Run(name, func(t *testing.T) {
@@ -218,6 +345,7 @@ func TestMatch(t *testing.T) {
 	nob, nor := langtag.MustParse("nob"), langtag.MustParse("nor")
 	nn := langtag.MustParse("nn")
 	hant, hans := langtag.MustParse("zh-Hant"), langtag.MustParse("zh-Hans")
+	esES, es419 := langtag.MustParse("es-ES"), langtag.MustParse("es-419")
 
 	cases := map[string]struct {
 		want, have langtag.Tag
@@ -226,6 +354,9 @@ func TestMatch(t *testing.T) {
 	}{
 		"identical floor rejects macrolanguage": {nob, nor, langtag.TierIdentical, false},
 		"same-language floor accepts it":        {nob, nor, langtag.TierSameLanguage, true},
+		"same-language floor rejects region":    {esES, es419, langtag.TierSameLanguage, false},
+		"other-region floor accepts region":     {esES, es419, langtag.TierOtherRegion, true},
+		"other-region floor rejects script":     {hans, hant, langtag.TierOtherRegion, false},
 		"same-language floor rejects script":    {hans, hant, langtag.TierSameLanguage, false},
 		"other-script floor accepts script":     {hans, hant, langtag.TierOtherScript, true},
 		"other-script floor rejects nynorsk":    {nob, nn, langtag.TierOtherScript, false},
@@ -251,10 +382,11 @@ func TestMatchIsMonotonicInFloor(t *testing.T) {
 	t.Parallel()
 	tags := []string{
 		"en", "en-GB", "nob", "nor", "nn", "da", "sv", "zh", "zh-Hans",
-		"zh-Hant", "cmn", "yue", "ca", "es", "es-419", "hr", "bs", "sr", "ta",
+		"zh-Hant", "cmn", "yue", "ca", "es", "es-419", "es-ES", "hr", "bs", "sr", "ta",
+		"en-US", "zh-Hant-HK", "zh-Hant-TW",
 	}
 	floors := []langtag.Tier{
-		langtag.TierIdentical, langtag.TierSameLanguage,
+		langtag.TierIdentical, langtag.TierSameLanguage, langtag.TierOtherRegion,
 		langtag.TierOtherScript, langtag.TierIntelligible, langtag.TierSharedLiteracy,
 	}
 	for _, a := range tags {

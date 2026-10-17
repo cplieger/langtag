@@ -31,18 +31,14 @@ var defaultComparer = WithFallbacks(builtinFallbacks)
 // Default returns the Comparer backed by the built-in table.
 func Default() *Comparer { return defaultComparer }
 
-// WithFallbacks returns a Comparer using the supplied cross-language table
-// instead of the built-in one. Passing nil or an empty slice disables both
-// cross-language tiers.
+// WithFallbacks returns a Comparer using f instead of the built-in
+// cross-language table; nil or empty disables both cross-language tiers.
+// Entries name languages as [Tag.Language] reports them ("no", not "nb").
 //
-// Entries name languages as [Tag.Language] reports them ("no" rather than
-// "nb" or "nor"); an entry naming anything else never matches.
-//
-// Malformed entries are dropped rather than accommodated, so an authoring
-// mistake removes a substitution instead of licensing an unintended one. See
-// [ValidateFallbacks] for which entries were rejected and why. An entry is
-// malformed when it names no language on either side, names one language on
-// both, carries no Kind, or claims a Kind that disagrees with its direction.
+// A malformed entry is dropped, so a mistake removes a substitution instead
+// of licensing one: no language on a side, one language on both, no Kind, or
+// a Kind that disagrees with its direction. [ValidateFallbacks] reports which
+// entries were dropped and why.
 func WithFallbacks(f []Fallback) *Comparer {
 	c := &Comparer{fallbacks: make(map[string]map[string]fallbackHit, len(f))}
 	add := func(want, have, reason string, tier Tier) {
@@ -149,20 +145,14 @@ func fallbackError(e Fallback) string {
 	}
 }
 
-// Preference is the language a person chose, bound to the fallback table
-// that judges substitutes for it. Construct one with [Prefer] for the
-// built-in table or [Comparer.Prefer] for a custom one.
+// Preference is the language a person chose, bound to the fallback table that
+// judges substitutes for it; build one with [Prefer] or [Comparer.Prefer].
+// Cross-language entries are directed (a Catalan viewer accepts Spanish, not
+// the reverse), so p.Compare(have) reads as the choice judging the offer.
 //
-// Cross-language entries are directed — a Catalan viewer accepts a Spanish
-// track, a Spanish viewer does not accept a Catalan one — and Preference
-// carries that direction so a comparison site holds only one Tag:
-// p.Compare(have) reads as the person's choice judging the offer.
-//
-// The zero Preference fails closed: it prefers the zero Tag, so Compare
-// answers [TierNone] for every input, Reason answers ok=false, and Match and
-// Best select nothing. A Preference built from a nil *Comparer fails closed
-// the same way — it judges nothing acceptable rather than silently
-// inheriting the built-in table.
+// The zero Preference, and one built from a nil *Comparer, fail closed:
+// Compare answers [TierNone] for every input, Reason answers ok=false, and
+// Match and Best select nothing.
 type Preference struct {
 	c    *Comparer
 	want Tag
@@ -229,26 +219,14 @@ func (p Preference) String() string {
 	return p.want.String()
 }
 
-// Best returns every candidate at the closest tier reached from the
-// preferred language, the tier itself, and whether anything was within
-// floor.
+// Best returns every candidate at the closest tier within floor, that tier,
+// and whether anything matched. Ranking within the tier (codec, flags, score)
+// is the caller's; input order is preserved so a tie-break stays
+// deterministic. tagOf extracts a candidate's language; a zero Tag never
+// matches. A floor of [TierNone] or beyond selects nothing.
 //
-// All returned candidates share one tier: ranking within a language (codec,
-// forced/hearing-impaired flags, provider score) is the caller's job. Input
-// order is preserved so an existing tie-break stays deterministic.
-//
-// tagOf extracts the language from a candidate, letting a caller pass its
-// own type without building a parallel slice. A candidate whose tag is the
-// zero Tag never matches.
-//
-// A floor of [TierNone] or beyond selects nothing rather than widening to
-// the most permissive tier — the safe reading of an unusable floor (e.g. one
-// [ParseTier] failed to parse) is that no substitution was authorised.
-//
-// Best is a generic METHOD on Preference (Go 1.27); before 1.27 this had to
-// be a package-level function taking the preference as its first argument.
-// A generic method can never satisfy an interface, so a caller abstracting
-// over selection strategies wraps this in a non-generic method of its own.
+// Best is a generic method (Go 1.27), so it satisfies no interface; wrap it
+// in a non-generic method to abstract over selection strategies.
 func (p Preference) Best[T any](candidates []T, tagOf func(T) Tag, floor Tier) (out []T, tier Tier, ok bool) {
 	if floor >= TierNone {
 		return nil, TierNone, false
@@ -289,11 +267,15 @@ func (c *Comparer) compare(want, have Tag) Tier {
 	}
 	if want.macroBase == have.macroBase {
 		// One language. Either it is written the same way and only the region
-		// differs, which changes nothing for a reader, or the script differs,
-		// which is usually real work. The exception is a language written in two
-		// scripts whose readers are taught both, which is no barrier at all.
-		if want.script == have.script ||
+		// differs, which matters only across a CLDR cluster, or the script
+		// differs, which is usually real work. Two exceptions are no barrier:
+		// a language written in two scripts whose readers are taught both,
+		// and an unknown script, which claims no difference.
+		if want.script == have.script || want.script == unknownScript || have.script == unknownScript ||
 			scriptsReadAsOne(want.macroBase, want.script, have.script) {
+			if acrossCluster(want, have) {
+				return TierOtherRegion
+			}
 			return TierSameLanguage
 		}
 		return TierOtherScript

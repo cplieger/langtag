@@ -32,7 +32,9 @@ This page covers what `Parse` accepts, how it canonicalizes a tag and what it re
 
 Only the dominant variety folds. `nob` folds onto `no` and `cmn` onto `zh`, while `nno` for Nynorsk and `yue` for Cantonese keep their own language.
 
-`Tag.Script` reports the ISO 15924 script. When a tag states none, it reports the default that [CLDR](https://cldr.unicode.org), the Unicode Consortium's shared locale data, gives the language, so a bare `zh` compares as `zh-Hans` and a bare `sr` as `sr-Cyrl`.
+`Tag.Script` reports the ISO 15924 script. When a tag states none, it reports the likely script that [CLDR](https://cldr.unicode.org), the Unicode Consortium's shared locale data, gives the language in that region, so a bare `zh` compares as `zh-Hans`, `zh-TW` as `zh-Hant` and a bare `sr` as `sr-Cyrl`. A language CLDR gives no script, such as `cnr`, reports `Zzzz`, the code for an unknown script. The answer comes from a table generated from a pinned CLDR release, never from `x/text`, as [Data sources](data-sources.md) describes.
+
+`Tag.StatedScript` and `Tag.Region` report the script and region subtags the canonical form states, and the empty string when it states none. `Tag.MultiScript` reports whether CLDR writes the language in a script that varies by region, as it does for Chinese, Serbian and Kurdish.
 
 ## What Parse rejects
 

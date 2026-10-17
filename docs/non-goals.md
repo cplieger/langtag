@@ -8,7 +8,7 @@ langtag does not substitute an unrelated language at `TierIntelligible` or close
 
 Claims of that shape live at `TierSharedLiteracy` alone, named for what they are and reached only by asking for that tier. The table ships one such entry, Catalan to Spanish. Extending it to the rest of that family is a decision for whoever runs the software, through `WithFallbacks`, rather than a default anybody inherits.
 
-The first three tiers cannot express a relationship between two languages at all, and `TierIntelligible` is a hand-curated symmetric set. So no floor short of `TierSharedLiteracy` reaches an unrelated language. Tests list 33 such pairs and check that each stays at `TierNone` in both directions.
+The first four tiers cannot express a relationship between two languages at all, and `TierIntelligible` is a hand-curated symmetric set. So no floor short of `TierSharedLiteracy` reaches an unrelated language. Tests list 32 such pairs and check that each stays at `TierNone` in both directions.
 
 ## Written, not spoken
 
@@ -18,4 +18,4 @@ Every cross-language entry is a claim about reading. Danish and Norwegian are cl
 
 langtag has no collation, formatting, content negotiation or `Accept-Language` parsing. It gives no numeric distance between tiers, because a number invites arithmetic across steps that do not share a scale.
 
-It ships no display names. The CLDR tables behind [`x/text/language/display`](https://pkg.go.dev/golang.org/x/text/language/display) add about 2.5 MB to a binary, so a caller that wants names imports that package directly.
+It ships English names only. The `names` package composes a tag's English name from CLDR's English display names and adds about 74 KB to a stripped binary. Names in every language would take the CLDR tables behind [`x/text/language/display`](https://pkg.go.dev/golang.org/x/text/language/display), which add about 2.5 MB, so a caller that wants them imports that package directly.

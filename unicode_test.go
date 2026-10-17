@@ -5,26 +5,15 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/cplieger/langtag/v2"
+	"github.com/cplieger/langtag/v3"
 )
 
-// This file pins the charset boundary: RFC 5646 §2.1 defines every BCP 47
-// subtag as ASCII alphanumerics, and golang.org/x/text enforces that with a
-// byte-level gate applied before any case folding, so no
-// unicode.RangeTable, SimpleFold orbit, or ToLower mapping is consulted on
-// any path a caller can reach. Tier names take the same ASCII-only route
-// through normaliseTierName.
-//
-// That matters because the alternative is a live hazard elsewhere: a
-// [strings.EqualFold] used as an identity check accepts a non-ASCII rune
-// that folds onto an ASCII one, which is how "localhoſt" once classified as
-// loopback in a sibling library. Subtag matching is exactly an identity
-// check, so these tests assert the refusal at each impersonation.
-//
-// Measured across go1.26.7 and go1.27.0 (Unicode 15.0.0 against 17.0.0):
-// Parse's accept set, canonical output, Language, Script and every Compare
-// tier are byte-identical, while strings.EqualFold's answer changed for
-// three rune pairs in the same interval.
+// This file pins the charset boundary: RFC 5646 §2.1 makes every subtag ASCII
+// alphanumerics, and x/text gates on bytes before any case fold, as does
+// normalizeTierName for tier names. A Unicode fold used as an identity check
+// accepts a rune that folds onto ASCII ("localhoſt" once passed as loopback
+// in a sibling library), so these tests assert the refusal at each
+// impersonation.
 
 // asciiFoldSpoofs pairs a real subtag with a non-ASCII string that a Unicode
 // fold or lowercase maps onto it; each must be refused even though a
@@ -151,8 +140,8 @@ func TestParseRefusesASCIIFoldSpoofs(t *testing.T) {
 			// The refusal must hold all the way through comparison: a spoof can
 			// never stand in for the language it impersonates, at any floor.
 			for _, floor := range []langtag.Tier{
-				langtag.TierIdentical, langtag.TierSameLanguage, langtag.TierOtherScript,
-				langtag.TierIntelligible, langtag.TierSharedLiteracy,
+				langtag.TierIdentical, langtag.TierSameLanguage, langtag.TierOtherRegion,
+				langtag.TierOtherScript, langtag.TierIntelligible, langtag.TierSharedLiteracy,
 			} {
 				if langtag.Prefer(honest).Match(got, floor) {
 					t.Errorf("Prefer(%q).Match(spoof %+q, %v) = true, want false", tc.honest, tc.spoof, floor)
@@ -229,13 +218,27 @@ func TestParseTierFoldsASCIIOnly(t *testing.T) {
 	t.Parallel()
 	t.Run("ascii case and separator forms are accepted", func(t *testing.T) {
 		t.Parallel()
-		for _, s := range []string{
-			"identical", "IDENTICAL", "Identical", "same-language", "SAME-LANGUAGE",
-			"same_language", " same-language ", "other-script", "intelligible",
-			"shared-literacy", "shared_literacy",
+		for _, tc := range []struct {
+			s    string
+			want langtag.Tier
+		}{
+			{"identical", langtag.TierIdentical},
+			{"IDENTICAL", langtag.TierIdentical},
+			{"Identical", langtag.TierIdentical},
+			{"same-language", langtag.TierSameLanguage},
+			{"SAME-LANGUAGE", langtag.TierSameLanguage},
+			{"same_language", langtag.TierSameLanguage},
+			{" same-language ", langtag.TierSameLanguage},
+			{"other-region", langtag.TierOtherRegion},
+			{"OTHER-REGION", langtag.TierOtherRegion},
+			{"other_region", langtag.TierOtherRegion},
+			{"other-script", langtag.TierOtherScript},
+			{"intelligible", langtag.TierIntelligible},
+			{"shared-literacy", langtag.TierSharedLiteracy},
+			{"shared_literacy", langtag.TierSharedLiteracy},
 		} {
-			if _, ok := langtag.ParseTier(s); !ok {
-				t.Errorf("ParseTier(%q) ok = false, want true", s)
+			if got, ok := langtag.ParseTier(tc.s); !ok || got != tc.want {
+				t.Errorf("ParseTier(%q) = (%v, %v), want (%v, true)", tc.s, got, ok, tc.want)
 			}
 		}
 	})

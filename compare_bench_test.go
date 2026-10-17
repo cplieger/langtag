@@ -4,28 +4,17 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cplieger/langtag/v2"
+	"github.com/cplieger/langtag/v3"
 )
 
-// Compare and Parse are measured separately because Parse costs one to two
-// orders of magnitude more (270-440 ns against 4-25 ns on one developer
-// machine), so a combined number would hide a regression in the tier ladder
-// inside parse noise. BenchmarkPreferenceAcrossTracks charts the shape a
-// consumer actually runs: one Preference judging many tracks, reused rather
-// than rebuilt per candidate.
-//
-// TestPreferenceCompareIsAllocationFree and
-// TestBestDoesNotAllocateWhenNothingMatches gate allocation counts that were
-// measured to hold before being asserted; the benchmarks below feed the
-// tracker, one series per distinct path through the ladder so a regression in
-// one path is not averaged away by the others. Neither allocation contract
-// calls t.Parallel: testing.AllocsPerRun pins GOMAXPROCS to 1 for its
-// measurement window, so a concurrent sibling's allocations would be
-// misattributed.
-//
-// Compare does not walk the fallback table — it is two map lookups
-// (compare.go) — so BenchmarkCompareFallbackBucket's two series must stay
-// flat regardless of table size; that is the property it charts.
+// Compare is benchmarked apart from Parse, which costs one to two orders of
+// magnitude more, so a tier-ladder regression is not hidden in parse noise;
+// each series is one path through the ladder, so one path's regression is not
+// averaged away. The cross-language fallback performs two map lookups, so
+// BenchmarkCompareFallbackBucket stays flat whatever the table size.
+// Neither Test function here calls t.Parallel: testing.AllocsPerRun panics
+// while a parallel test runs (Go 1.25), since the process-wide malloc count
+// would include the sibling's: https://go.dev/doc/go1.25#testing.
 
 // compareSink* consume every result these benchmarks produce. b.Loop keeps the
 // call itself from being elided, but a return value nothing reads is still
@@ -52,16 +41,17 @@ type tierPair struct {
 }
 
 // tierPairs covers every tier the ladder defines. same_language_close_script
-// is the only linear scan in the comparison path (scriptsReadAsOne in
-// scripts.go) and is charted separately from the macro/region same-language
-// cases, which share a branch. shared_literacy is uncharted because it
-// reaches the same map lookup as intelligible; compare_test.go covers its
-// correctness.
+// (scriptsReadAsOne) and other_region (the regionClusters scan in regions.go)
+// are the comparison path's linear scans, so each is charted apart from the
+// macro/region same-language cases, which share a branch. shared_literacy is
+// uncharted because it reaches the same map lookup as intelligible;
+// compare_test.go covers its correctness.
 func tierPairs() []tierPair {
 	return []tierPair{
 		{"identical", "ger", "deu", langtag.TierIdentical, true},
 		{"same_language_macro", "nob", "nor", langtag.TierSameLanguage, true},
-		{"same_language_region", "es-ES", "es-419", langtag.TierSameLanguage, false},
+		{"same_language_region", "es-MX", "es-419", langtag.TierSameLanguage, false},
+		{"other_region", "es-ES", "es-419", langtag.TierOtherRegion, true},
 		{"same_language_close_script", "sr-Latn", "sr-Cyrl", langtag.TierSameLanguage, true},
 		{"other_script", "zh-Hans", "zh-Hant", langtag.TierOtherScript, true},
 		{"intelligible", "nb", "nn", langtag.TierIntelligible, true},
@@ -149,9 +139,9 @@ func TestBestDoesNotAllocateWhenNothingMatches(t *testing.T) {
 
 // BenchmarkCompare measures each distinct path through the tier ladder. This is
 // the first-party half of the library's cost, and it is charted per path because
-// the paths do different work: an identical answer is one string comparison, a
-// cross-language answer is two map lookups, and a close-script answer walks the
-// CloseScripts list.
+// the paths do different work: the identical path stops at canonical equality,
+// a cross-language fallback adds two map lookups, and a close-script answer
+// walks CloseScripts.
 func BenchmarkCompare(b *testing.B) {
 	for _, pair := range tierPairs() {
 		if !pair.charted {

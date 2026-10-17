@@ -52,19 +52,12 @@ func (k Kind) String() string {
 }
 
 // Fallback is one directed cross-language relationship: a reader who wants the
-// language Want can use a track in the language Have.
-//
-// Want and Have are primary language subtags after macrolanguage folding —
-// the value [Tag.Language] reports — so one entry covers every spelling of
-// the languages it names.
-//
-// Both are bare strings, so a table author can write them in the wrong
-// order and no type objects; ValidateFallbacks catches the mechanical
-// mistakes (empty side, same-language pair, Kind/Both mismatch), and Reason
-// forces every entry to state its argument in the claimed direction. A
-// swapped pair whose Reason reads backwards is caught by review, not by a
-// type: a table literal with named fields already shows both role names at
-// every site.
+// language Want can use a track in the language Have. Want and Have are
+// primary language subtags after macrolanguage folding (what [Tag.Language]
+// reports), so one entry covers every spelling. Being bare strings, they can
+// be swapped with no type objecting: [ValidateFallbacks] catches the
+// mechanical mistakes (empty side, same-language pair, Kind/Both mismatch),
+// and a Reason that reads backwards is left to review.
 type Fallback struct {
 	// Want is the language subtag a reader asked for.
 	Want string
@@ -84,19 +77,13 @@ type Fallback struct {
 	Both bool
 }
 
-// builtinFallbacks is the curated cross-language table. Every entry is a
-// claim about people, not about code, and each is arguable. Three rules
-// govern what belongs here: it must not be derivable (anything following
-// from macrolanguage folding, script or region structure is already tiers
-// 0-2 and is a fact, not a judgment); its Kind must match its direction
-// (Intelligible is symmetric, SharedLiteracy is one-way — an entry claiming
-// the former in one direction only understates itself); and its provenance
-// must be checkable against CLDR's languageInfo.xml, never against
-// golang.org/x/text's matcher, which embeds a CLDR snapshot old enough to
-// disagree with upstream (it does not know cs/sk or ca/es, and still
-// carries the retired mk/bg). A missing entry leaves a track alone; a wrong
-// entry silently rewrites a language nobody asked for — grow this table on
-// request, not on inference.
+// builtinFallbacks is the curated cross-language table; each entry is an
+// arguable claim about people. An entry must not be derivable (folding,
+// script or region structure is already tiers 0-3), its Kind must match its
+// direction, and its provenance must check against CLDR's languageInfo.xml,
+// not x/text's matcher, whose older CLDR snapshot lacks cs/sk and ca/es and
+// keeps the retired mk/bg. A wrong entry silently rewrites a language nobody
+// asked for, so grow it on request, not on inference.
 var builtinFallbacks = []Fallback{
 	{
 		Want: "no", Have: "nn", Kind: Intelligible, Both: true,
@@ -118,10 +105,36 @@ var builtinFallbacks = []Fallback{
 		Provenance: "CLDR languageInfo.xml, hr<->bs, distance 4, symmetric.",
 	},
 	{
+		Want: "sr", Have: "hr", Kind: Intelligible, Both: true,
+		Reason: "Serbian and Croatian are mutually intelligible, and Serbian " +
+			"schooling teaches the Latin script Croatian is written in.",
+		Provenance: "CLDR languageInfo.xml release-48 lines 23 and 25, sh->hr and sh->sr, " +
+			"distance 4. CLDR aliases sh to sr_Latn (supplementalMetadata.xml line 241) and " +
+			"comments out its own sr rows (languageInfo.xml lines 22 and 24), so this " +
+			"entry is langtag's reading of the sh rows as Serbian.",
+	},
+	{
+		Want: "sr", Have: "bs", Kind: Intelligible, Both: true,
+		Reason: "Serbian and Bosnian are mutually intelligible, and Serbian " +
+			"schooling teaches the Latin script Bosnian is written in.",
+		Provenance: "CLDR languageInfo.xml release-48 lines 21 and 25, sh->bs and sh->sr, " +
+			"distance 4. CLDR aliases sh to sr_Latn (supplementalMetadata.xml line 241) and " +
+			"comments out its own sr rows (languageInfo.xml lines 22 and 24), so this " +
+			"entry is langtag's reading of the sh rows as Serbian.",
+	},
+	{
 		Want: "cs", Have: "sk", Kind: Intelligible, Both: true,
 		Reason: "Czech and Slovak are mutually intelligible in writing, and were " +
 			"taught alongside each other for most of the twentieth century.",
 		Provenance: "CLDR languageInfo.xml, cs<->sk, distance 20, symmetric.",
+	},
+	{
+		Want: "ms", Have: "id", Kind: Intelligible, Both: true,
+		Reason: "Malay and Indonesian are standards of one language, written in " +
+			"the same Latin alphabet and spelling since 1972.",
+		Provenance: "CLDR languageInfo.xml release-48 line 107, ms->id distance 30, and " +
+			"line 261, id->ms distance 10: both directions. ISO 639-3 places ind " +
+			"inside the msa macrolanguage.",
 	},
 	{
 		Want: "ca", Have: "es", Kind: SharedLiteracy, Both: false,
