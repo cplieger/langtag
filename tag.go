@@ -105,7 +105,7 @@ func Parse(raw string) (Tag, bool) {
 		out.scriptAt = uint8(len(own) + 1) //nolint:gosec // a language subtag is at most 8 bytes (RFC 5646)
 	}
 	if region != (language.Region{}) {
-		out.regionAt = uint8(len(out.canon) - len(region.String())) //nolint:gosec // canon, lang-Script-Region, is at most 17 bytes
+		out.regionAt = uint8(strings.LastIndexByte(out.canon, '-') + 1) //nolint:gosec // canon, lang-Script-Region, is at most 17 bytes
 	}
 	out.script = out.StatedScript()
 	if out.script == "" {
