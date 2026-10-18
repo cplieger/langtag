@@ -1,0 +1,71 @@
+# Runs the CLDR refresh, go run ./internal/gen/refresh, on dev and uploads
+# its proposal as the community-data-refresh artifact. cplieger/ci's
+# community-data-refresh.yaml reads the newest run's artifact and opens or
+# updates the pull request from it with its own App token, so this workflow
+# holds no secret and its refresh job, with contents: read, only uploads the
+# proposal: https://github.com/cplieger/ci/blob/main/docs/workflows.md
+name: Community data refresh
+
+on:
+  schedule:
+    - cron: "17 5 3 * *"   # the 3rd of each month, 05:17 UTC
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "CLDR release tag, such as release-48-2 (default: the latest release)"
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    name: Refresh the CLDR data
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          # No cache: this job's output becomes a pull request, and a restored
+          # cache is a write path into it (zizmor: cache-poisoning).
+          cache: false
+
+      - name: Run the refresh
+        env:
+          RELEASE: ${{ inputs.release }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: go run ./internal/gen/refresh -release "$RELEASE" -out "$RUNNER_TEMP/proposal"
+
+      - name: Upload the proposal
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: community-data-refresh
+          path: ${{ runner.temp }}/proposal
+          if-no-files-found: error
+          retention-days: 7
+
+  # `needs:` must list every other job in this workflow.
+  notify:
+    needs: refresh
+    if: always()
+    # notify-failure reads the run's jobs, checks out cplieger/ci for its
+    # script and files or closes the tracker issue.
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    uses: cplieger/ci/.github/workflows/notify-failure.yaml@aac311a65dc75b9da51d00736bff0ed72ec9209c # v3
+    with:
+      workflow: ${{ github.workflow }}
+      run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

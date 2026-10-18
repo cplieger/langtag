@@ -5,8 +5,10 @@
 //	go run ./internal/gen/refresh [-release <tag>] [-out <dir>]
 //
 // It prints "no change" when the pin already names both releases, and
-// otherwise every path it changed. With -out it also writes the pull
-// request's title and body there, as title and body.md. It fails when
+// otherwise every path it changed. With -out it also writes the proposal
+// cplieger/ci's community data refresh opens a pull request from:
+// proposal.json listing the changed paths (none at the pin), their content
+// under files/, and the pull request's title and body.md. It fails when
 // cldr-json has not published the CLDR release yet. Run from the module
 // root; GITHUB_TOKEN, when set, authenticates the GitHub API reads.
 package main
@@ -14,6 +16,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -31,7 +34,7 @@ import (
 
 func main() {
 	release := flag.String("release", "", "move to this CLDR release tag (default: the latest CLDR release)")
-	out := flag.String("out", "", "when the pin moves, write the pull request's title and body.md to this directory")
+	out := flag.String("out", "", "write the proposal to this directory")
 	flag.Parse()
 	api := github{base: "https://api.github.com", token: os.Getenv("GITHUB_TOKEN")}
 	req := request{root: ".", release: *release, out: *out}
@@ -61,37 +64,60 @@ func run(ctx context.Context, w io.Writer, req request, api github, goRun goFunc
 	if err != nil {
 		return err
 	}
+	var p proposal
+	if to != from {
+		if p, err = move(ctx, req.root, from, to, goRun); err != nil {
+			return err
+		}
+	}
+	if req.out != "" {
+		err = p.write(req.out)
+	}
+	if err != nil {
+		return err
+	}
 	if to == from {
 		_, err = fmt.Fprintf(w, "no change: the pin already names %s (cldr-json %s)\n", to.Release, to.JSONVersion)
 		return err
 	}
-	before, err := snapshot(req.root)
-	if err != nil {
-		return err
-	}
-	report, err := regenerate(ctx, req.root, to, goRun)
-	if err != nil {
-		return err
-	}
-	after, err := snapshot(req.root)
-	if err != nil {
-		return err
-	}
-	if req.out != "" {
-		err = writeText(req.out, title(to), body(from, to, report))
-	}
-	if err != nil {
-		return err
-	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "moved the pin from %s (cldr-json %s) to %s (cldr-json %s)\n", from.Release, from.JSONVersion, to.Release, to.JSONVersion)
-	for _, path := range generated {
-		if !bytes.Equal(before[path], after[path]) {
-			fmt.Fprintf(&b, "changed %s\n", path)
-		}
+	for _, path := range p.changed {
+		fmt.Fprintf(&b, "changed %s\n", path)
 	}
 	_, err = io.WriteString(w, b.String())
 	return err
+}
+
+// proposal is what a refresh changed: the zero proposal changes nothing.
+type proposal struct {
+	content     map[string][]byte
+	title, body string
+	changed     []string
+}
+
+// move regenerates root at to and returns the proposal of every generated
+// path that changed.
+func move(ctx context.Context, root string, from, to cldr.Pin, goRun goFunc) (proposal, error) {
+	before, err := snapshot(root)
+	if err != nil {
+		return proposal{}, err
+	}
+	report, err := regenerate(ctx, root, to, goRun)
+	if err != nil {
+		return proposal{}, err
+	}
+	after, err := snapshot(root)
+	if err != nil {
+		return proposal{}, err
+	}
+	p := proposal{content: after, title: title(to), body: body(from, to, report)}
+	for _, path := range generated {
+		if !bytes.Equal(before[path], after[path]) {
+			p.changed = append(p.changed, path)
+		}
+	}
+	return p, nil
 }
 
 // releaseShape is a CLDR release tag: release-48, or release-48-2 for a
@@ -201,11 +227,36 @@ func body(from, to cldr.Pin, report string) string {
 	return head + report + tail
 }
 
-func writeText(dir, title, body string) error {
-	if err := os.WriteFile(filepath.Join(dir, "title"), []byte(title+"\n"), 0o600); err != nil {
+// write writes dir in the proposal format of cplieger/ci's
+// docs/workflows.md, with the title and body only when something changed.
+func (p proposal) write(dir string) error {
+	for _, path := range p.changed {
+		dest := filepath.Join(dir, "files", filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(dest), 0o750); err != nil {
+			return err
+		}
+		if err := os.WriteFile(dest, p.content[path], 0o600); err != nil {
+			return err
+		}
+	}
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "body.md"), []byte(body), 0o600)
+	if len(p.changed) > 0 {
+		if err := os.WriteFile(filepath.Join(dir, "title"), []byte(p.title+"\n"), 0o600); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dir, "body.md"), []byte(p.body), 0o600); err != nil {
+			return err
+		}
+	}
+	manifest, err := json.Marshal(struct {
+		Changes []string `json:"changes"`
+	}{Changes: append([]string{}, p.changed...)})
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "proposal.json"), append(manifest, '\n'), 0o600)
 }
 
 func goCommand(ctx context.Context, root string, stdout io.Writer, env []string, args ...string) error {
