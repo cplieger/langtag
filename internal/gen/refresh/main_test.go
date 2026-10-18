@@ -144,6 +144,21 @@ func readOut(t *testing.T, dir string) (title, body string) {
 	return string(tb), string(bb)
 }
 
+func readProposal(t *testing.T, dir string) []string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(dir, "proposal.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Changes []string `json:"changes"`
+	}
+	if err := json.Unmarshal(b, &manifest); err != nil || manifest.Changes == nil {
+		t.Fatalf("proposal.json = %q (%v), want a changes list", b, err)
+	}
+	return manifest.Changes
+}
+
 func assertNoOut(t *testing.T, dir string) {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -169,7 +184,13 @@ func TestRunAtThePinChangesNothing(t *testing.T) {
 	if len(g.calls) != 0 {
 		t.Errorf("ran %q, want no go command", g.calls)
 	}
-	assertNoOut(t, out)
+	if changes := readProposal(t, out); len(changes) != 0 {
+		t.Errorf("proposal.json lists %q, want no change", changes)
+	}
+	entries, err := os.ReadDir(out)
+	if err != nil || len(entries) != 1 {
+		t.Errorf("-out holds %v (%v), want proposal.json alone", entries, err)
+	}
 }
 
 func TestRunMovesThePin(t *testing.T) {
@@ -209,6 +230,19 @@ func TestRunMovesThePin(t *testing.T) {
 	}
 	if want := body(cldr.Pinned(), cldr.Pin{Release: "release-49", JSONVersion: "49.0.1"}, g.report); gotBody != want {
 		t.Errorf("body.md = %q, want %q", gotBody, want)
+	}
+	wantChanges := []string{"internal/gen/cldr/cldr.go", "scripttable.go", "names/table.go", "names/testdata/names.golden"}
+	if changes := readProposal(t, out); !slices.Equal(changes, wantChanges) {
+		t.Errorf("proposal.json lists %q, want %q", changes, wantChanges)
+	}
+	for _, path := range generated {
+		b, err := os.ReadFile(filepath.Join(out, "files", filepath.FromSlash(path)))
+		switch {
+		case slices.Contains(wantChanges, path) && (err != nil || string(b) != "new "+path):
+			t.Errorf("files/%s = %q, %v; want its regenerated content", path, b, err)
+		case !slices.Contains(wantChanges, path) && !errors.Is(err, fs.ErrNotExist):
+			t.Errorf("files/%s exists (%v), want only changed paths", path, err)
+		}
 	}
 	for _, auth := range fake.auths {
 		if auth != "Bearer test-token" {
