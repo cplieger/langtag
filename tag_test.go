@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cplieger/langtag/v3"
+	"golang.org/x/text/language"
 )
 
 func TestParse(t *testing.T) {
@@ -365,4 +366,121 @@ func statedSubtags(canon string) (script, region string) {
 		region = parts[0]
 	}
 	return script, region
+}
+
+func TestISO3(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"fr": "fra", "fr-CA": "fra", "de": "deu", "pt-BR": "por",
+		"zh-Hant": "zho", "zh-Hant-HK": "zho", "sr-Latn": "srp",
+		"nb": "nob", "no": "nor", "es-419": "spa", "nl-BE": "nld",
+		"fil": "fil", "yue": "yue", "cnr": "cnr",
+		"qaa": "", "": "",
+	}
+	for raw, want := range cases {
+		tag, _ := langtag.Parse(raw)
+		if got := tag.ISO3(); got != want {
+			t.Errorf("Parse(%q).ISO3() = %q, want %q", raw, got, want)
+		}
+	}
+}
+
+// Sonarr's IsoLanguages.cs rows, copied with each row's ThreeLetterCode:
+// https://github.com/Sonarr/Sonarr/blob/2b39049ee6e16e1b326792009ea4b985e29adf48/src/NzbDrone.Core/Parser/IsoLanguages.cs
+func TestISO3MatchesSonarr(t *testing.T) {
+	t.Parallel()
+	rows := []struct{ name, twoLetter, country, threeLetter string }{
+		{"English", "en", "", "eng"},
+		{"French", "fr", "fr", "fra"},
+		{"Spanish", "es", "", "spa"},
+		{"German", "de", "de", "deu"},
+		{"Italian", "it", "", "ita"},
+		{"Danish", "da", "", "dan"},
+		{"Dutch", "nl", "", "nld"},
+		{"Japanese", "ja", "", "jpn"},
+		{"Icelandic", "is", "", "isl"},
+		{"Chinese", "zh", "cn", "zho"},
+		{"Russian", "ru", "", "rus"},
+		{"Polish", "pl", "", "pol"},
+		{"Vietnamese", "vi", "", "vie"},
+		{"Swedish", "sv", "", "swe"},
+		{"Norwegian", "no", "", "nor"},
+		{"Norwegian", "nb", "", "nob"},
+		{"Finnish", "fi", "", "fin"},
+		{"Turkish", "tr", "", "tur"},
+		{"Portuguese", "pt", "pt", "por"},
+		{"Flemish", "nl", "", "nld"},
+		{"Greek", "el", "", "ell"},
+		{"Korean", "ko", "", "kor"},
+		{"Hungarian", "hu", "", "hun"},
+		{"Hebrew", "he", "", "heb"},
+		{"Lithuanian", "lt", "", "lit"},
+		{"Czech", "cs", "", "ces"},
+		{"Arabic", "ar", "", "ara"},
+		{"Hindi", "hi", "", "hin"},
+		{"Bulgarian", "bg", "", "bul"},
+		{"Malayalam", "ml", "", "mal"},
+		{"Ukrainian", "uk", "", "ukr"},
+		{"Slovak", "sk", "", "slk"},
+		{"Thai", "th", "th", "tha"},
+		{"PortugueseBrazil", "pt", "br", "por"},
+		{"SpanishLatino", "es", "mx", "spa"},
+		{"Romanian", "ro", "", "ron"},
+		{"Latvian", "lv", "", "lav"},
+		{"Persian", "fa", "", "fas"},
+		{"Catalan", "ca", "", "cat"},
+		{"Croatian", "hr", "", "hrv"},
+		{"Serbian", "sr", "", "srp"},
+		{"Bosnian", "bs", "", "bos"},
+		{"Estonian", "et", "", "est"},
+		{"Tamil", "ta", "", "tam"},
+		{"Indonesian", "id", "", "ind"},
+		{"Macedonian", "mk", "", "mkd"},
+		{"Slovenian", "sl", "", "slv"},
+		{"Azerbaijani", "az", "", "aze"},
+		{"Uzbek", "uz", "", "uzb"},
+		{"Malay", "ms", "", "msa"},
+		{"Urdu", "ur", "", "urd"},
+		{"Romansh", "rm", "", "roh"},
+		{"Georgian", "ka", "", "kat"},
+		{"Irish", "ga", "", "gle"},
+	}
+	for _, row := range rows {
+		raw := row.twoLetter
+		if row.country != "" {
+			raw += "-" + row.country
+		}
+		if got := langtag.MustParse(raw).ISO3(); got != row.threeLetter {
+			t.Errorf("Sonarr %s: Parse(%q).ISO3() = %q, want %q", row.name, raw, got, row.threeLetter)
+		}
+	}
+}
+
+func TestISO3MatchesXText(t *testing.T) {
+	t.Parallel()
+	codes := make([]string, 0, 26*26*27)
+	for a := 'a'; a <= 'z'; a++ {
+		for b := 'a'; b <= 'z'; b++ {
+			codes = append(codes, string([]rune{a, b}))
+			for c := 'a'; c <= 'z'; c++ {
+				codes = append(codes, string([]rune{a, b, c}))
+			}
+		}
+	}
+	checked := 0
+	for _, raw := range codes {
+		tag, ok := langtag.Parse(raw)
+		if !ok {
+			continue
+		}
+		checked++
+		own, _, _ := strings.Cut(tag.String(), "-")
+		want := language.MustParseBase(own).ISO3()
+		if got := tag.ISO3(); got != want {
+			t.Errorf("Parse(%q).ISO3() = %q, want x/text's %q for %q", raw, got, want, own)
+		}
+	}
+	if checked < 7000 {
+		t.Errorf("checked %d subtags, want every ISO 639 code Parse accepts (over 7,000)", checked)
+	}
 }

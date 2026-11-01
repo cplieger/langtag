@@ -20,6 +20,20 @@ func ExampleParse() {
 	// nor  -> tag no  language no
 }
 
+// ISO3 names the tag's own language in three letters, for an API keyed on
+// ISO 639-3 codes.
+func ExampleTag_ISO3() {
+	for _, raw := range []string{"fr-CA", "pt-BR", "nb", "no", "yue"} {
+		fmt.Printf("%-5s -> %s\n", raw, langtag.MustParse(raw).ISO3())
+	}
+	// Output:
+	// fr-CA -> fra
+	// pt-BR -> por
+	// nb    -> nob
+	// no    -> nor
+	// yue   -> yue
+}
+
 // Compare grades the distance rather than answering yes or no.
 func ExamplePreference_Compare() {
 	p := langtag.Prefer(langtag.MustParse("nob"))

@@ -67,4 +67,12 @@ go run ./internal/gen/pin -iso
 
 ### The monthly refresh
 
-The `CLDR refresh` workflow (`.github/workflows/cldr-refresh.yaml`) runs on the 3rd of each month and on demand, with an optional `cldr_tag` input. It reads the newest CLDR release tag and takes the newest cldr-json release of that CLDR release, and fails when cldr-json has not published it yet. It does nothing when both equal the pin. Otherwise it writes the script table's report, moves the pin, regenerates every table, updates the names golden and opens the `cldr-refresh` pull request against `dev` with the report as its body. The pull request is opened with a GitHub App's token, set as the `SYNC_APP_ID` and `SYNC_APP_PRIVATE_KEY` repository secrets, so its CI runs. A names failure that names `ISO-639-2_utf-8.txt` is the ISO pin above, not a CLDR change.
+One command runs the steps above for the newest release:
+
+```sh
+go run ./internal/gen/refresh
+```
+
+It reads the latest CLDR release tag and the newest cldr-json release of that CLDR release, and fails when cldr-json has not published it yet. `-release <tag>` names another CLDR release. It prints `no change` when the pin already names both. Otherwise it writes the script table's report, moves the pin, regenerates every table, updates the names golden and prints each path it changed. With `-out <dir>` it also writes a proposal there: `proposal.json` lists the paths it changed, none when the pin did not move, `files/` holds their new content, and `title` and `body.md`, the report included, hold the pull request's text. `GITHUB_TOKEN`, when set, authenticates its GitHub API reads. A failed regeneration names the ISO 639-2 pin above, which a refresh never moves.
+
+The `community-data-refresh.yaml` workflow runs this command on `dev` on the 3rd of each month, and on demand with an optional `release`. It holds no secret and uploads the proposal as an artifact. The [community data refresh](https://github.com/cplieger/ci/blob/main/docs/workflows.md#workflows-for-this-repository-only) in cplieger/ci reads that artifact and, when the proposal changes anything, opens or updates the `community-data-refresh` pull request against `dev`. The pull request needs a passing `ci / validate` and a human merge.

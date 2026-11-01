@@ -36,6 +36,8 @@ Only the dominant variety folds. `nob` folds onto `no` and `cmn` onto `zh`, whil
 
 `Tag.StatedScript` and `Tag.Region` report the script and region subtags the canonical form states, and the empty string when it states none. `Tag.MultiScript` reports whether CLDR writes the language in a script that varies by region, as it does for Chinese, Serbian and Kurdish.
 
+`Tag.ISO3` reports the ISO 639-3 code of the tag's own language subtag, before macrolanguage folding: `fra` for `fr-CA`, `nob` for `nb` and `nor` for `no`. Use it for an API that keys on three-letter codes. It is empty for the zero `Tag`.
+
 ## What Parse rejects
 
 `Parse` returns `ok == false` and the zero `Tag` for these inputs:

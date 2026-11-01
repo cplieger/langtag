@@ -32,8 +32,9 @@ var (
 // rejected input — the path a library full of untagged tracks runs most.
 func TestTagAccessorsAreAllocationFree(t *testing.T) {
 	tags := map[string]langtag.Tag{
-		"populated": langtag.MustParse("zh-Hant-HK"),
-		"zero":      {},
+		"populated":    langtag.MustParse("zh-Hant-HK"),
+		"three-letter": langtag.MustParse("yue"),
+		"zero":         {},
 	}
 	for name, tag := range tags {
 		t.Run(name, func(t *testing.T) {
@@ -43,6 +44,7 @@ func TestTagAccessorsAreAllocationFree(t *testing.T) {
 				"Script":       func() { parseSinkString = tag.Script() },
 				"StatedScript": func() { parseSinkString = tag.StatedScript() },
 				"Region":       func() { parseSinkString = tag.Region() },
+				"ISO3":         func() { parseSinkString = tag.ISO3() },
 				"MultiScript":  func() { parseSinkBool = tag.MultiScript() },
 				"IsZero":       func() { parseSinkBool = tag.IsZero() },
 			}

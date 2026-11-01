@@ -101,7 +101,7 @@ func Read(ctx context.Context, f File) ([]byte, error) {
 // Get returns f at p without checking its SHA-256: the bytes of a release
 // not pinned yet.
 func Get(ctx context.Context, f File, p Pin) ([]byte, error) {
-	return fetch.Get(ctx, f.URL(p), f.limit)
+	return fetch.Get(ctx, f.URL(p), nil, f.limit)
 }
 
 // check refuses b unless it hashes to f's pinned SHA-256.

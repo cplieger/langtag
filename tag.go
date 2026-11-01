@@ -2,6 +2,7 @@ package langtag
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/cplieger/langtag/v3/internal/multiscript"
 	"golang.org/x/text/language"
@@ -185,3 +186,32 @@ func (t Tag) Region() string {
 // own subtag or for its [Tag.Language] (kmr through ku). For such a language
 // a tag stating a region but no script leaves the script to that region.
 func (t Tag) MultiScript() bool { return t.multiScript }
+
+// ISO3 returns the ISO 639-3 code of the tag's own language subtag, before
+// macrolanguage folding: "fra" for fr-CA, "nob" for nb, "nor" for no. It is ""
+// for the zero Tag.
+func (t Tag) ISO3() string {
+	own, _, _ := strings.Cut(t.canon, "-")
+	if len(own) == 3 {
+		return own
+	}
+	return iso3OfAlpha2()[own]
+}
+
+// iso3OfAlpha2 maps every canonical two-letter language subtag to its
+// Base.ISO3. x/text builds a two-letter code's answer by concatenation, one
+// allocation per call, so ISO3 reads this table to stay allocation-free like
+// every other accessor. A canonical three-letter subtag is its own ISO3
+// (TestISO3MatchesXText pins both facts against x/text).
+var iso3OfAlpha2 = sync.OnceValue(func() map[string]string {
+	codes := make(map[string]string, 200)
+	for a := byte('a'); a <= 'z'; a++ {
+		for b := byte('a'); b <= 'z'; b++ {
+			code := string([]byte{a, b})
+			if base, err := language.ParseBase(code); err == nil {
+				codes[code] = base.ISO3()
+			}
+		}
+	}
+	return codes
+})
