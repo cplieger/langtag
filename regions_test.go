@@ -11,10 +11,10 @@ import (
 )
 
 // containmentCopy is supplementalData.xml's territoryContainment at CLDR
-// release-48, lines 1234-1279, one row per group element in file order,
+// release-49, lines 1234-1279, one row per group element in file order,
 // grouping and deprecated rows included. It is the oracle the generated
 // table and the region tier are checked against, never read from either.
-// https://github.com/unicode-org/cldr/blob/release-48/common/supplemental/supplementalData.xml
+// https://github.com/unicode-org/cldr/blob/release-49/common/supplemental/supplementalData.xml
 var containmentCopy = []struct{ group, contains string }{
 	{"001", "019 002 150 142 009"},
 	{"001", "EU EZ UN"},
@@ -60,7 +60,7 @@ var containmentCopy = []struct{ group, contains string }{
 	{"009", "053 054 057 061 QO"},
 	{"QO", "AQ AC CP DG TA"},
 	{"EU", "AT BE CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT SE SI SK BG RO"},
-	{"EZ", "AT BE CY DE EE ES FI FR GR IE IT LT LU LV MT NL PT SI SK"},
+	{"EZ", "AT BE BG CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK"},
 	{"UN", "AD AE AF AG AL AM AO AR AT AU AZ BA BB BD BE BF BG BH BI BJ BN BO BR BS BT BW BY BZ CA CD CF CG CH CI CL CM CN CO CR CU CV CY CZ DE DJ DK DM DO DZ EC EE EG ER ES ET FI FJ FM FR GA GB GD GE GH GM GN GQ GR GT GW GY HN HR HT HU ID IE IL IN IQ IR IS IT JM JO JP KE KG KH KI KM KN KP KR KW KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MG MH MK ML MM MN MR MT MU MV MX MW MY MZ NA NE NG NI NL NO NR NP NZ OM PA PE PG PH PK PL PT PW PY QA RO RS RU RW SA SB SC SD SE SG SI SK SL SM SN SO SR SS ST SV SY SZ TD TG TH TJ TL TM TN TO TR TT TV TZ UA UG US UY UZ VC VE VN VU WS YE ZA ZM ZW"},
 }
 

@@ -68,6 +68,23 @@ func (f *fakeGitHub) serve() github {
 	return github{base: srv.URL, token: "test-token"}
 }
 
+// nextMajor is the CLDR major release after the pin, so a test that needs a
+// newer release still has one after a refresh moves the pin.
+var nextMajor = func() int {
+	major, err := strconv.Atoi(strings.Split(cldr.Release, "-")[1])
+	if err != nil {
+		panic(fmt.Sprintf("cldr.Release %q: %v", cldr.Release, err))
+	}
+	return major + 1
+}()
+
+// next is the CLDR release tag after the pin.
+var next = fmt.Sprintf("release-%d", nextMajor)
+
+// nextJSON is the cldr-json tag <nextMajor>.<rest>, a release packaging next
+// when rest is 0.<patch>.
+func nextJSON(rest string) string { return fmt.Sprintf("%d.%s", nextMajor, rest) }
+
 func published(tags ...string) []release {
 	out := make([]release, len(tags))
 	for i, tag := range tags {
@@ -195,14 +212,14 @@ func TestRunAtThePinChangesNothing(t *testing.T) {
 
 func TestRunMovesThePin(t *testing.T) {
 	t.Parallel()
-	fake := &fakeGitHub{t: t, latest: "release-49", releases: []release{
-		{TagName: "49.0.3", Draft: true},
-		{TagName: "49.0.2", Prerelease: true},
-		{TagName: "49.1.0"},
-		{TagName: "49.0.1"},
-		{TagName: "49.0.0-BETA4", Prerelease: true},
-		{TagName: "49.0.0"},
-		{TagName: "48.0.0"},
+	fake := &fakeGitHub{t: t, latest: next, releases: []release{
+		{TagName: nextJSON("0.3"), Draft: true},
+		{TagName: nextJSON("0.2"), Prerelease: true},
+		{TagName: nextJSON("1.0")},
+		{TagName: nextJSON("0.1")},
+		{TagName: nextJSON("0.0-BETA4"), Prerelease: true},
+		{TagName: nextJSON("0.0")},
+		{TagName: cldr.JSONVersion},
 	}}
 	api := fake.serve()
 	root, out, g := moduleRoot(t), t.TempDir(), movingGo()
@@ -211,24 +228,24 @@ func TestRunMovesThePin(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantCalls := []string{
-		"run ./internal/gen/likely -diff release-49",
-		"run ./internal/gen/pin -release release-49 -json 49.0.1",
+		"run ./internal/gen/likely -diff " + next,
+		"run ./internal/gen/pin -release " + next + " -json " + nextJSON("0.1"),
 		"generate ./...",
 		"UPDATE_GOLDEN=1 test -count=1 -run ^TestNamesGolden$ ./names",
 	}
 	if !slices.Equal(g.calls, wantCalls) {
 		t.Errorf("ran %q, want %q", g.calls, wantCalls)
 	}
-	wantOut := fmt.Sprintf("moved the pin from %s (cldr-json %s) to release-49 (cldr-json 49.0.1)\n", cldr.Release, cldr.JSONVersion) +
+	wantOut := fmt.Sprintf("moved the pin from %s (cldr-json %s) to %s (cldr-json %s)\n", cldr.Release, cldr.JSONVersion, next, nextJSON("0.1")) +
 		"changed internal/gen/cldr/cldr.go\nchanged scripttable.go\nchanged names/table.go\nchanged names/testdata/names.golden\n"
 	if w.String() != wantOut {
 		t.Errorf("printed %q, want %q", w.String(), wantOut)
 	}
 	gotTitle, gotBody := readOut(t, out)
-	if gotTitle != "feat: update the CLDR data to release-49 (cldr-json 49.0.1)\n" {
+	if want := fmt.Sprintf("feat: update the CLDR data to %s (cldr-json %s)\n", next, nextJSON("0.1")); gotTitle != want {
 		t.Errorf("title = %q", gotTitle)
 	}
-	if want := body(cldr.Pinned(), cldr.Pin{Release: "release-49", JSONVersion: "49.0.1"}, g.report); gotBody != want {
+	if want := body(cldr.Pinned(), cldr.Pin{Release: next, JSONVersion: nextJSON("0.1")}, g.report); gotBody != want {
 		t.Errorf("body.md = %q, want %q", gotBody, want)
 	}
 	wantChanges := []string{"internal/gen/cldr/cldr.go", "scripttable.go", "names/table.go", "names/testdata/names.golden"}
@@ -275,30 +292,30 @@ func TestRunRefuses(t *testing.T) {
 		wantCalls       int
 	}{
 		"cldr-json lacks the release": {
-			latest: "release-49", releases: published("48.2.3", cldr.JSONVersion),
-			wantErr: fmt.Sprintf("cldr-json has published no release of CLDR release-49 yet; the pin stays at %s (cldr-json %s)", cldr.Release, cldr.JSONVersion),
+			latest: next, releases: published("48.2.3", cldr.JSONVersion),
+			wantErr: fmt.Sprintf("cldr-json has published no release of CLDR %s yet; the pin stays at %s (cldr-json %s)", next, cldr.Release, cldr.JSONVersion),
 		},
 		"only a pre-release of it": {
-			latest: "release-49", releases: []release{{TagName: "49.0.0", Prerelease: true}},
-			wantErr: "no release of CLDR release-49",
+			latest: next, releases: []release{{TagName: nextJSON("0.0"), Prerelease: true}},
+			wantErr: "no release of CLDR " + next,
 		},
 		"a malformed latest tag":  {latest: "release-49-beta1", wantErr: `CLDR release tag "release-49-beta1"`},
 		"a malformed release tag": {release: "release-49/../x", wantErr: "want release-<major>"},
 		"the API refuses":         {status: http.StatusForbidden, wantErr: "403"},
 		"the report fails": {
-			latest: "release-49", releases: published("49.0.0"), fail: "./internal/gen/likely",
+			latest: next, releases: published(nextJSON("0.0")), fail: "./internal/gen/likely",
 			wantErr: "report the script table's change", wantCalls: 1,
 		},
 		"the pin fails": {
-			latest: "release-49", releases: published("49.0.0"), fail: "./internal/gen/pin",
+			latest: next, releases: published(nextJSON("0.0")), fail: "./internal/gen/pin",
 			wantErr: "move the pin", wantCalls: 2,
 		},
 		"the tables fail": {
-			latest: "release-49", releases: published("49.0.0"), fail: "generate",
+			latest: next, releases: published(nextJSON("0.0")), fail: "generate",
 			wantErr: "regenerate the tables: go generate ./...: exit status 1; the names generator also fetches ISO-639-2_utf-8.txt", wantCalls: 3,
 		},
 		"the golden fails": {
-			latest: "release-49", releases: published("49.0.0"), fail: "test",
+			latest: next, releases: published(nextJSON("0.0")), fail: "test",
 			wantErr: "regenerate the names golden", wantCalls: 4,
 		},
 	} {

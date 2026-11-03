@@ -5,19 +5,19 @@ package cldr
 // The CLDR release every table reads, the cldr-json release packaging it,
 // and the day the unversioned ISO 639-2 file was fetched.
 const (
-	Release     = "release-48"
-	JSONVersion = "48.0.0"
+	Release     = "release-49"
+	JSONVersion = "49.0.0"
 	ISOFetched  = "2026-10-16"
 )
 
 // sums holds the SHA-256 of each File by name.
 var sums = map[string]string{
-	"common/supplemental/likelySubtags.xml":                           "d7732172848cc2870d0d316818190e704bc6614486168dc52af56ee1427b6860",
-	"common/supplemental/supplementalData.xml":                        "fb054c9f9a95f0c4da9dd1e5e0ef6dd208b6f9a73f45303011be247277d81bef",
-	"common/supplemental/languageInfo.xml":                            "cbce5b94e9f7546684305e9211762870a7380ce75594700b543136c72f66df17",
-	"cldr-json/cldr-localenames-full/main/en/languages.json":          "97668b25c51fefd572d9a60498d60edab7094fa678f3085027aa0cb9f0d38c8c",
-	"cldr-json/cldr-localenames-full/main/en/scripts.json":            "f41f2ddfbafd59b7c65d57056b84a13086016802261a076acb33183a69514ea7",
-	"cldr-json/cldr-localenames-full/main/en/territories.json":        "158c1d575308f7e46912edbeda435c8fe2ef5dad280798231f3a432e406b1807",
-	"cldr-json/cldr-localenames-full/main/en/localeDisplayNames.json": "5d728f3106786bf64f10547c6aef92c115611f1eaebadbcd1d5750e2133d8024",
+	"common/supplemental/likelySubtags.xml":                           "114019e183cffd98262c8c137d40d215124f80d9ba474a594d6ffa1b551b0a96",
+	"common/supplemental/supplementalData.xml":                        "745150ec1408d50e1a272b65654a5dd645f3e60f5cc2898b576f725b28538d1a",
+	"common/supplemental/languageInfo.xml":                            "bf1ee4e9947c08fb83c1cd4ab7c49f226d5f31dcb15bb208aaee8457a06a0827",
+	"cldr-json/cldr-localenames-full/main/en/languages.json":          "6180f817207decbc0f9cd0deb34ed0bad3256ff4d03c3c4252706285e8636b88",
+	"cldr-json/cldr-localenames-full/main/en/scripts.json":            "614a57f49733751c5b2d8df4bd880e5354582ee8362e47e3a2633bedc13b2403",
+	"cldr-json/cldr-localenames-full/main/en/territories.json":        "1326fb3bcdf8b8cf63df73ea02ea7f8bf7a8362cbb60bd12bcdb53f3ad22bf04",
+	"cldr-json/cldr-localenames-full/main/en/localeDisplayNames.json": "0e4e701b5224f121652a1afbe162b7884ad21efc189bb4477bbe454f17c9d48b",
 	"ISO-639-2_utf-8.txt":                                             "42b71885e4dc885559fda5ad059fd81838cf4782cedb5fd08cc3431f7d067371",
 }

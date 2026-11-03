@@ -26,6 +26,7 @@ language ang Old English
 language ann Obolo
 language anp Angika
 language apa Apache languages
+language apw Western Apache
 language ar Arabic
 language arc Aramaic
 language arn Mapuche
@@ -361,6 +362,7 @@ language lij Ligurian
 language lil Lillooet
 language liv Livonian
 language lkt Lakota
+language lld Ladin
 language lmo Lombard
 language ln Lingala
 language lo Lao
@@ -402,6 +404,7 @@ language mgo Metaʼ
 language mh Marshallese
 language mi Māori
 language mic Mi'kmaw
+language mid Mandaic
 language min Minangkabau
 language mis Uncoded languages
 language mk Macedonian
@@ -450,6 +453,7 @@ language nl Dutch
 language nmg Kwasio
 language nn Norwegian Nynorsk
 language nnh Ngiemboon
+language nnp Wancho
 language no Norwegian
 language nog Nogai
 language non Old Norse
@@ -512,6 +516,7 @@ language qug Chimborazo Highland Quichua
 language raj Rajasthani
 language rap Rapanui
 language rar Rarotongan
+language rej Rejang
 language rgn Romagnol
 language rhg Rohingya
 language rif Riffian
@@ -537,7 +542,7 @@ language sam Samaritan Aramaic
 language saq Samburu
 language sas Sasak
 language sat Santali
-language saz Saurashtra
+language saz Sourashtra
 language sba Ngambay
 language sbp Sangu
 language sc Sardinian
@@ -565,6 +570,9 @@ language si Sinhala
 language sid Sidamo
 language sio Siouan languages
 language sit Sino-Tibetan languages
+language sjd Kildin Sami
+language sje Pite Sami
+language sju Ume Sami
 language sk Slovak
 language sl Slovenian
 language sla Slavic languages
@@ -844,6 +852,7 @@ script Osma Osmanya
 script Ougr Old Uyghur
 script Palm Palmyrene
 script Pauc Pau Cin Hau
+script Pcun Proto-Cuneiform
 script Perm Old Permic
 script Phag Phags-pa
 script Phli Inscriptional Pahlavi
@@ -860,7 +869,8 @@ script Runr Runic
 script Samr Samaritan
 script Sara Sarati
 script Sarb Old South Arabian
-script Saur Saurashtra
+script Saur Sourashtra
+script Seal Seal
 script Sgnw SignWriting
 script Shaw Shavian
 script Shrd Sharada
@@ -1052,7 +1062,7 @@ region GU Guam
 region GW Guinea-Bissau
 region GY Guyana
 region HK Hong Kong SAR China
-region HM Heard & McDonald Islands
+region HM Heard Island & McDonald Islands
 region HN Honduras
 region HR Croatia
 region HT Haiti
@@ -1157,7 +1167,7 @@ region SC Seychelles
 region SD Sudan
 region SE Sweden
 region SG Singapore
-region SH St. Helena
+region SH St. Helena, Ascension & Tristan da Cunha
 region SI Slovenia
 region SJ Svalbard & Jan Mayen
 region SK Slovakia
@@ -1175,7 +1185,7 @@ region SZ Eswatini
 region TA Tristan da Cunha
 region TC Turks & Caicos Islands
 region TD Chad
-region TF French Southern Territories
+region TF French Southern and Antarctic Lands
 region TG Togo
 region TH Thailand
 region TJ Tajikistan
