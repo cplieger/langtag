@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
   "lastUpdate": 1793745283452,
-  "repoUrl": "https://github.com/cplieger/ci",
+  "repoUrl": "https://github.com/cplieger/langtag",
   "entries": {
     "Benchmark": [
       {
@@ -4490,19 +4490,19 @@ window.BENCHMARK_DATA = {
       {
         "commit": {
           "author": {
-            "name": "Christopher Plieger",
-            "username": "cplieger",
-            "email": "917744+cplieger@users.noreply.github.com"
+            "name": "tribble-trouble[bot]",
+            "username": "tribble-trouble[bot]",
+            "email": "338123824+tribble-trouble[bot]@users.noreply.github.com"
           },
           "committer": {
             "name": "GitHub",
             "username": "web-flow",
             "email": "noreply@github.com"
           },
-          "id": "9ead40e51a68dd7202d29b68a7ab6cbcb6e5d0cb",
-          "message": "chore(audit): expect AGPL-3.0 for grelot (#915)",
-          "timestamp": "2026-11-03T19:17:26Z",
-          "url": "https://github.com/cplieger/ci/commit/9ead40e51a68dd7202d29b68a7ab6cbcb6e5d0cb"
+          "id": "05b21e4f15025fa6ffdad411840cdd8d11fa43db",
+          "message": "feat: update the CLDR data to release-49 (cldr-json 49.0.0) (#285)\n\n## Release note\n\nThe language, script and region tables now follow CLDR 49. Bulgaria and Croatia are in the Eurozone region `EZ`, and 86 languages gain, change or lose their likely script.",
+          "timestamp": "2026-11-03T20:08:04Z",
+          "url": "https://github.com/cplieger/langtag/commit/05b21e4f15025fa6ffdad411840cdd8d11fa43db"
         },
         "date": 1793745282532,
         "tool": "customSmallerIsBetter",
