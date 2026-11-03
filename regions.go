@@ -7,7 +7,7 @@ import (
 
 // regionCluster is one of CLDR's paradigm clusters: regions of one language
 // that CLDR rates closer among themselves than to any region outside (at
-// most 4 against 5 at release-48). regionClusters in regiontable.go lists them,
+// most 4 against 5 at release-49). regionClusters in regiontable.go lists them,
 // generated where the languageMatch rules of languageInfo.xml rate them so.
 type regionCluster struct {
 	// language is the [Tag.Language] both tags share.

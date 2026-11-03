@@ -24,7 +24,7 @@ func TestEnglish(t *testing.T) {
 		{"nn", "Norwegian Nynorsk"},
 		{"nb", "Norwegian Bokmål"},
 		{"no", "Norwegian"},
-		// CLDR 48 en does not name cnr; the ISO 639-2 file does.
+		// CLDR 49 en does not name cnr; the ISO 639-2 file does.
 		{"cnr", "Montenegrin"},
 		{"zh", "Chinese"},
 		// Only stated subtags are named: zh-TW resolves to Hant but states none.

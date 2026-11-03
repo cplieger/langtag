@@ -7,7 +7,7 @@ import (
 )
 
 // TestResolvedScript pins the script an unstated-script tag resolves to
-// against CLDR 48's likely subtags, the rows x/text v0.43.0's older snapshot
+// against CLDR 49's likely subtags, the rows x/text v0.43.0's older snapshot
 // answers differently (zh-MY Hant, ku-IQ Latn, ms-ID Arab, sd-IN Arab). Each
 // of those was an automatic script crossing: a bare ku target took a ku-IQ
 // file, which CLDR writes in Arabic, as the same script.
@@ -32,7 +32,7 @@ func TestResolvedScript(t *testing.T) {
 		"kmr-IQ": "Arab",
 		"zsm-CC": "Arab",
 		"uzn-AF": "Arab",
-		// CLDR 48 holds no row for either, so the script is unknown.
+		// CLDR 49 holds no row for either, so the script is unknown.
 		"cnr": "Zzzz",
 		"ber": "Zzzz",
 		// A stated script is never overridden by a row.
