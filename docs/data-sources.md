@@ -16,7 +16,7 @@ Every table reads one pin, [`internal/gen/cldr/cldr.go`](../internal/gen/cldr/cl
 
 A tag's script is its stated script. Otherwise it is the script of the first row keyed by the tag's language and region, its macrolanguage and region, its language, then its macrolanguage. `cmn-MY` and `zh-MY` agree because the lookup falls back from `cmn` to `zh`. A language with no row, such as `cnr`, reports `Zzzz`.
 
-`golang.org/x/text` carries an older copy of this data that disagrees with CLDR 48. It resolves `zh-MY` to Traditional Chinese, `ku-IQ` to Latin and `ms-ID` to Arabic. langtag never reads it.
+`golang.org/x/text` carries an older copy of this data that disagrees with CLDR 49. It resolves `zh-MY` to Traditional Chinese, `ku-IQ` to Latin and `ms-ID` to Arabic. langtag never reads it.
 
 ## Region containment and clusters
 
@@ -28,7 +28,7 @@ Every group row counts, including the grouping rows (`419`, `EU`, `UN`) and the 
 
 `matchVariables` in `regiontable.go` lists the regions of each cluster. The generator reads a variable's value as UTS #35 writes it: region codes joined by `+`, a union, and `-`, a set difference, read left to right, a group standing for every region it contains. A group joins the list only when every region it contains is in it, so `019` takes in `419` and `MX`.
 
-`regionClusters` in `regiontable.go` binds each cluster to its language, and to the Traditional script for `$cnsar`, as the `languageMatch` rules do. The generator does not trust the rules' shape. It evaluates them as [UTS #35 language matching](https://www.unicode.org/reports/tr35/tr35.html#EnhancedLanguageMatching) does: the first rule matching a pair of regions gives their distance. It keeps a cluster only when every pair of regions across it is rated farther apart than every pair on one side, over every pair of placed regions where neither contains the other. Otherwise it fails and names the two pairs. CLDR 48 rates a pair on one side 3 or 4 and every pair across 5. The generator also refuses what the table cannot hold: a variable named for every language, two clusters for one language and script, and a variable no rule names.
+`regionClusters` in `regiontable.go` binds each cluster to its language, and to the Traditional script for `$cnsar`, as the `languageMatch` rules do. The generator does not trust the rules' shape. It evaluates them as [UTS #35 language matching](https://www.unicode.org/reports/tr35/tr35.html#EnhancedLanguageMatching) does: the first rule matching a pair of regions gives their distance. It keeps a cluster only when every pair of regions across it is rated farther apart than every pair on one side, over every pair of placed regions where neither contains the other. Otherwise it fails and names the two pairs. CLDR 49 rates a pair on one side 3 or 4 and every pair across 5. The generator also refuses what the table cannot hold: a variable named for every language, two clusters for one language and script, and a variable no rule names.
 
 `TestRegionTableMatchesCopy`, `TestMatchVariablesMatchCopy` and `TestRegionClustersMatchCopy` compare the table with hand copies of the rows and clusters kept in `regions_test.go`, each citing the release and lines it was copied from. `TestMultiScriptMatchesCopy` in `scripttable_test.go` and `TestResolvedScript` in `scripts_test.go` do the same for the script table. A hand edit or a regeneration that moves a row these tests copy fails them until a reviewer updates the copies. Any other hand edit shows as a diff when the tables are regenerated from the pin.
 
@@ -36,7 +36,7 @@ Every group row counts, including the grouping rows (`419`, `EU`, `UN`) and the 
 
 `names/table.go` holds the names `names.English` composes. The language, script and region names and the display pattern, `{0} ({1})` with a comma between a script and a region, come from CLDR's English locale in cldr-json. The table keeps the entries keyed by one subtag and drops the combined ones, so `pt-BR` is "Portuguese (Brazil)" and never "Brazilian Portuguese". Scripts take their in-context names ("Simplified") and regions their long names ("Hong Kong SAR China").
 
-A language CLDR's English locale leaves unnamed takes the first English name the ISO 639-2 Registration Authority gives it. CLDR 48 names no `cnr`, so Montenegrin comes from that file. Where `Parse` turns a listed code into a subtag with no name of its own, that subtag takes the code's name: ISO 639-2 lists `bih`, which `Parse` reads as `bh`, so `bh` is "Bihari languages" too.
+A language CLDR's English locale leaves unnamed takes the first English name the ISO 639-2 Registration Authority gives it. CLDR 49 names no `cnr`, so Montenegrin comes from that file. Where `Parse` turns a listed code into a subtag with no name of its own, that subtag takes the code's name: ISO 639-2 lists `bih`, which `Parse` reads as `bh`, so `bh` is "Bihari languages" too.
 
 `names/testdata/names.golden` lists every row and a set of composed names, and `TestNamesGolden` fails until it matches the compiled table.
 

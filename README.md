@@ -4,7 +4,7 @@
 
 langtag matches a viewer's language choice to subtitle and audio tracks tagged in ISO 639 or BCP 47, and grades how close each substitute is.
 
-A viewer picks a subtitle tagged `nob`, and the next episode carries only `nor`. String equality finds no match, though both name Norwegian. langtag replaces that check and the code tables you would keep by hand. It depends only on [`golang.org/x/text`](https://pkg.go.dev/golang.org/x/text), needs Go 1.27 or later and is licensed under Apache-2.0.
+A viewer picks a subtitle tagged `nob`, and the next episode carries only `nor`. String equality finds no match, though both name Norwegian. langtag replaces that check and the code tables you would keep by hand. It depends only on [`golang.org/x/text`](https://pkg.go.dev/golang.org/x/text) and is licensed under Apache-2.0.
 
 ## Why use it
 
@@ -122,7 +122,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 This project is built with care and follows security best practices, but it is intended for personal / self-hosted use. No guarantees of fitness for production environments. Use at your own risk.
 
-This project was built with AI-assisted tooling using [Claude](https://claude.com), [GPT](https://openai.com), and [Kiro](https://kiro.dev). The human maintainer defines architecture, supervises implementation, and makes all final decisions.
+This project was built with AI assistance. The human maintainer defines architecture, supervises implementation, and makes all final decisions.
 
 ## License
 
